@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Struk PLN - Portrait A5</title>
+    <style>
+        /* Pengaturan Cetak A5 Potret */
+        @page {
+            size: A5 portrait;
+            margin: 0.5cm;
+        }
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            margin: 20px;
+            background-color: #f0f2f5;
+            color: #000;
+        }
+
+        /* Panel Input (Hanya di Layar) */
+        .input-panel {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            max-width: 500px;
+        }
+        .grid-input {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 11px; color: #666; margin-bottom: 2px; }
+        input { padding: 6px; border: 1px solid #ccc; border-radius: 4px; }
+        button { 
+            width: 100%;
+            padding: 12px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: bold;
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+        button:hover { background: #0056b3; }
+
+        /* Desain Struk (Tampilan & Cetak) */
+        .struk-container {
+            width: 100%;
+            max-width: 380px; /* Ukuran ideal struk potret */
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #eee;
+            line-height: 1.1;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            font-weight: bold;
+            border-bottom: 2px solid #000;
+            margin-bottom: 8px;
+            padding-bottom: 5px;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        td { padding: 1px 0; vertical-align: top; }
+        .label { width: 35%; }
+        .titik { width: 5%; text-align: center; }
+        .value { width: 60%; font-weight: bold; }
+        
+        .divider { 
+            border-top: 1px dashed #000; 
+            margin: 6px 0; 
+        }
+        .footer {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 10px;
+            border-top: 1px solid #000;
+            padding-top: 8px;
+        }
+        .watermark {
+            text-align: center;
+            font-size: 9px;
+            margin-top: 5px;
+            color: #888;
+        }
+
+        @media print {
+            .input-panel { display: none; }
+            body { background: white; margin: 0; }
+            .struk-container { border: none; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="input-panel">
+    <h2 style="margin-top:0; font-family: sans-serif;">Data Pembayaran</h2>
+    <div class="grid-input">
+        <div class="input-group"><label>ID Pelanggan</label><input type="text" id="in_id" value="535512348890"></div>
+        <div class="input-group"><label>Nama</label><input type="text" id="in_nama" value="SUGENG RAHAYU"></div>
+        <div class="input-group"><label>Tarif/Daya</label><input type="text" id="in_daya" value="R1/450 VA"></div>
+        <div class="input-group"><label>Bulan (Contoh: MAR26)</label><input type="text" id="in_bln" value="MAR26"></div>
+        <div class="input-group"><label>Stand Meter</label><input type="text" id="in_stand" value="001420-001580"></div>
+        <div class="input-group"><label>No. Ref</label><input type="text" id="in_ref" value="REF99283746554P"></div>
+        <div class="input-group"><label>Tagihan Rp</label><input type="number" id="in_tag" value="85600"></div>
+        <div class="input-group"><label>Admin Rp</label><input type="number" id="in_adm" value="2500"></div>
+    </div>
+    <button onclick="window.print()">CETAK STRUK SEKARANG</button>
+</div>
+
+<div class="struk-container">
+    <div class="header">
+        STRUK PEMBAYARAN LISTRIK<br>
+        PT. PLN (PERSERO)
+    </div>
+    
+    <table>
+        <tr><td class="label">ID PELANGGAN</td><td class="titik">:</td><td class="value" id="out_id">535512348890</td></tr>
+        <tr><td class="label">NAMA</td><td class="titik">:</td><td class="value" id="out_nama">SUGENG RAHAYU</td></tr>
+        <tr><td class="label">TARIF/DAYA</td><td class="titik">:</td><td class="value" id="out_daya">R1/450 VA</td></tr>
+        <tr><td class="label">BL/TH</td><td class="titik">:</td><td class="value" id="out_bln">MAR26</td></tr>
+        <tr><td class="label">STAND METER</td><td class="titik">:</td><td class="value" id="out_stand">001420-001580</td></tr>
+    </table>
+
+    <div class="divider"></div>
+
+    <table>
+        <tr><td class="label">RP TAG PLN</td><td class="titik">:</td><td class="value" id="out_tag">RP 85.600</td></tr>
+        <tr><td class="label">ADMIN BANK</td><td class="titik">:</td><td class="value" id="out_adm">RP 2.500</td></tr>
+        <tr style="font-size: 14px;"><td class="label">TOTAL BAYAR</td><td class="titik">:</td><td class="value" id="out_total">RP 88.100</td></tr>
+    </table>
+
+    <div class="divider"></div>
+
+    <table>
+        <tr><td class="label">NO REF</td><td class="titik">:</td><td class="value" id="out_ref" style="font-size: 11px;">REF99283746554P</td></tr>
+    </table>
+
+    <div class="footer">
+        PLN menyatakan struk ini sebagai bukti pembayaran yang sah.<br>
+        Rincian tagihan dapat diakses melalui aplikasi PLN Mobile.<br>
+        <strong>--- TERIMA KASIH ---</strong>
+    </div>
+</div>
+
+<script>
+    const inputs = document.querySelectorAll('input');
+    
+    function formatRP(angka) {
+        return "RP " + parseInt(angka).toLocaleString('id-ID');
+    }
+
+    function updateStruk() {
+        document.getElementById('out_id').innerText = document.getElementById('in_id').value;
+        document.getElementById('out_nama').innerText = document.getElementById('in_nama').value.toUpperCase();
+        document.getElementById('out_daya').innerText = document.getElementById('in_daya').value.toUpperCase();
+        document.getElementById('out_bln').innerText = document.getElementById('in_bln').value.toUpperCase();
+        document.getElementById('out_stand').innerText = document.getElementById('in_stand').value;
+        document.getElementById('out_ref').innerText = document.getElementById('in_ref').value;
+
+        const tag = parseInt(document.getElementById('in_tag').value) || 0;
+        const adm = parseInt(document.getElementById('in_adm').value) || 0;
+        
+        document.getElementById('out_tag').innerText = formatRP(tag);
+        document.getElementById('out_adm').innerText = formatRP(adm);
+        document.getElementById('out_total').innerText = formatRP(tag + adm);
+        
+        const skrg = new Date();
+        document.getElementById('tgl_cetak').innerText = skrg.toLocaleString('id-ID');
+    }
+
+    inputs.forEach(input => {
+        input.addEventListener('input', updateStruk);
+    });
+
+    // Inisialisasi tanggal saat pertama buka
+    updateStruk();
+</script>
+
+</body>
+</html>

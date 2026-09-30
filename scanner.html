@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang='id'>
+<head>
+<meta charset='UTF-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+<title>OnePrint Android Print</title>
+
+<script src='https://cdn.tailwindcss.com'></script>
+<script src='https://unpkg.com/html5-qrcode'></script>
+<script src='https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js'></script>
+
+<style>
+body{
+background:linear-gradient(135deg,#fefce8,#f7fee7,#fef9c3);
+font-family:Arial,sans-serif;
+}
+.glass{
+background:rgba(255,255,255,.82);
+backdrop-filter:blur(14px);
+border:1px solid rgba(255,255,255,.45);
+}
+#printArea{
+display:none;
+}
+@media print{
+body *{
+visibility:hidden;
+}
+#printArea,#printArea *{
+visibility:visible;
+}
+#printArea{
+display:flex;
+flex-direction:column;
+align-items:center;
+position:absolute;
+left:0;
+top:0;
+width:48mm;
+padding:1mm;
+box-sizing:border-box;
+background:white;
+color:black;
+}
+#printQR{
+display:block;
+margin:0 auto !important;
+}
+.no-print{
+display:none!important;
+}
+}
+</style>
+</head>
+
+<body class='min-h-screen p-4 lg:p-8'>
+
+<div class='max-w-7xl mx-auto grid lg:grid-cols-2 gap-6 no-print'>
+
+<div class='space-y-6'>
+
+<div class='glass rounded-[34px] p-7 shadow-2xl'>
+
+<div class='text-4xl font-black text-slate-800'>
+OnePrint Scanner
+</div>
+
+<div class='text-slate-500 mt-1'>
+QR Generator + Android Print Service
+</div>
+
+<div class='mt-8 grid gap-5'>
+
+<input id='customer' type='text'
+placeholder='Nama Pelanggan'
+class='w-full rounded-2xl border-0 bg-white p-4 shadow-lg'>
+
+<input id='unit' type='text'
+placeholder='Jenis Unit'
+class='w-full rounded-2xl border-0 bg-white p-4 shadow-lg'>
+
+<div class='flex gap-3'>
+
+<input id='manualCode' type='text'
+placeholder='OPS-250616-001'
+class='flex-1 rounded-2xl border-0 bg-white p-4 shadow-lg'>
+
+<button onclick='generateRandomCode()'
+class='px-5 rounded-2xl bg-lime-500 text-white font-black shadow-lg'>
+AUTO
+</button>
+
+</div>
+
+<div class='grid grid-cols-1 lg:grid-cols-2 gap-4'>
+
+<button onclick='generateQR()'
+class='rounded-3xl bg-gradient-to-r from-green-500 to-emerald-500 text-white p-5 shadow-xl font-black'>
+Generate QR
+</button>
+
+<button onclick='printThermal()'
+class='rounded-3xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white p-5 shadow-xl font-black'>
+Print Bluetooth
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div class='glass rounded-[34px] p-7 shadow-2xl'>
+
+<div class='text-2xl font-black text-slate-800 mb-5'>
+Preview Label
+</div>
+
+<div class='bg-white rounded-3xl p-6 shadow-xl flex flex-col items-center'>
+
+<canvas id='qrcode'></canvas>
+
+<div class='mt-5 text-center'>
+
+<div id='previewCode'
+class='text-2xl font-black text-slate-800'>
+Belum dibuat
+</div>
+
+<div id='previewInfo'
+class='text-slate-500 mt-2'>
+QR akan muncul di sini
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div class='space-y-6'>
+
+<div class='glass rounded-[34px] p-7 shadow-2xl'>
+
+<div class='text-3xl font-black text-slate-800'>
+Scanner Kamera
+</div>
+
+<button id='scanToggleBtn' onclick='toggleScanner()'
+class='mt-4 rounded-2xl bg-blue-600 text-white px-5 py-3 font-black shadow-lg'>
+Start Scan
+</button>
+
+<div id='reader'
+class='mt-6 rounded-3xl overflow-hidden'></div>
+
+<div class='mt-5 bg-slate-900 text-white rounded-[24px] p-5'>
+
+<div class='text-xs uppercase tracking-widest text-slate-400 font-bold'>
+LAST SCAN
+</div>
+
+<div id='scanResult'
+class='mt-2 text-2xl font-black text-green-400 break-all'>
+Belum ada hasil
+</div>
+
+<div class='grid grid-cols-2 gap-3 mt-5'>
+
+<button onclick='copyScanResult()'
+class='rounded-2xl bg-white/10 py-3 font-bold'>
+Copy ID
+</button>
+
+<button onclick='fillManualCode()'
+class='rounded-2xl bg-lime-500 text-slate-900 py-3 font-bold'>
+Gunakan ID
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<div id="printArea">
+
+<div style="text-align:center">
+
+<div style="font-size:10px;font-weight:700;line-height:1.1">
+ONEPRINT SERVICE
+</div>
+
+<div style="font-size:8px;margin-top:1px">
+Printer • Laptop • IT Support
+</div>
+<div style="border-top:1px dashed #000;margin:2px 0;"></div>
+
+<div id="printCode"
+style="font-size:6px;margin-top:3px">
+</div>
+
+<div id="printCustomer"
+style="font-size:6px;margin-top:0px">
+</div>
+
+<div id="printUnit"
+style="font-size:6px;margin-top:0px">
+</div>
+
+<div style="margin-top:3px;width:75%;display:flex;justify-content:center;align-items:center">
+<canvas id="printQR"></canvas>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+function generateRandomCode(){
+
+const random =
+'OPS-' +
+new Date().getFullYear().toString().slice(-2) +
+String(new Date().getMonth()+1).padStart(2,'0') +
+String(new Date().getDate()).padStart(2,'0') +
+'-' +
+Math.floor(Math.random()*900+100);
+
+document.getElementById('manualCode').value = random;
+
+}
+
+function generateQR(){
+
+const code = document.getElementById('manualCode').value;
+const customer = document.getElementById('customer').value;
+const unit = document.getElementById('unit').value;
+
+if(!code){
+alert('Masukkan kode terlebih dahulu');
+return;
+}
+
+const qrText = code;
+
+QRCode.toCanvas(
+document.getElementById('qrcode'),
+qrText,
+{
+width:220,
+margin:1
+}
+);
+
+QRCode.toCanvas(
+document.getElementById('printQR'),
+qrText,
+{
+width:100,
+margin:1
+}
+);
+
+document.getElementById('previewCode').innerText = code;
+
+document.getElementById('previewInfo').innerText =
+(customer || '-') + ' | ' + (unit || '-');
+
+document.getElementById('printCode').innerText =
+'ID : ' + code;
+
+document.getElementById('printCustomer').innerText =
+'Nama : ' + (customer || '-');
+
+document.getElementById('printUnit').innerText =
+'Unit : ' + (unit || '-');
+
+}
+
+function printThermal(){
+
+generateQR();
+
+setTimeout(()=>{
+window.print();
+},300);
+
+}
+
+function startScanner(){
+
+if(scannerRunning) return;
+
+
+html5QrCode = new Html5Qrcode('reader');
+
+scannerRunning = true;
+
+document.getElementById('scanToggleBtn').innerText = 'Stop Scan';
+document.getElementById('scanToggleBtn').classList.remove('bg-blue-600');
+document.getElementById('scanToggleBtn').classList.add('bg-red-500');
+
+html5QrCode.start(
+{ facingMode:'environment' },
+{
+fps:10,
+qrbox:{width:250,height:250}
+},
+(decodedText)=>{
+
+document.getElementById('scanResult').innerText = decodedText;
+document.getElementById('manualCode').value = decodedText;
+
+if(navigator.vibrate){
+navigator.vibrate(120);
+}
+
+},
+()=>{}
+);
+
+}
+
+
+let html5QrCode = null;
+let scannerRunning = false;
+
+function toggleScanner(){
+if(scannerRunning){
+stopScanner();
+}else{
+startScanner();
+}
+}
+
+function stopScanner(){
+
+if(html5QrCode){
+
+html5QrCode.stop().then(()=>{
+
+scannerRunning = false;
+
+document.getElementById('scanToggleBtn').innerText =
+'Start Scan';
+
+document.getElementById('scanToggleBtn')
+.classList.remove('bg-red-500');
+
+document.getElementById('scanToggleBtn')
+.classList.add('bg-blue-600');
+
+});
+
+}
+
+}
+
+function copyScanResult(){
+
+const text =
+document.getElementById('scanResult').innerText;
+
+if(text && text !== 'Belum ada hasil'){
+navigator.clipboard.writeText(text);
+alert('ID berhasil disalin');
+}
+
+}
+
+function fillManualCode(){
+
+const text =
+document.getElementById('scanResult').innerText;
+
+if(text && text !== 'Belum ada hasil'){
+document.getElementById('manualCode').value = text;
+}
+
+}
+
+
+generateRandomCode();
+
+</script>
+
+</body>
+</html>
