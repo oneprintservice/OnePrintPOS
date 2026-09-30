@@ -6,9 +6,9 @@ import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js";
-import { printReceipt } from "./features/receipt.js?v=20260923-printfix";
+import { printReceipt } from "./features/receipt.js?v=20260930-trackingfix2";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks } from "./features/restock.js";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20260930-restockdelete2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -255,11 +255,18 @@ function renderRestock() {
     if ([...select.options].some(o => o.value === current)) select.value = current;
   }
   const rows = state.restocks.slice(0, 30);
-  $("#restock-list").innerHTML = rows.map(x => `<tr>
-    <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
-    <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
-    <td>${x.qty} ${escapeHtml(x.satuan || "")}</td><td>${money(x.total)}</td>
-  </tr>`).join("") || `<tr><td colspan="4" class="empty">Belum ada riwayat restock.</td></tr>`;
+  $("#restock-list").innerHTML = rows.map(x => {
+    const canDelete = Boolean(x.itemKey && x.kategori && Number(x.qty) > 0 && !x.fromLedger);
+    return `<tr>
+      <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
+      <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
+      <td>${x.qty} ${escapeHtml(x.satuan || "")}</td>
+      <td>${money(x.total)}</td>
+      <td>${canDelete
+        ? `<button class="table-action danger" data-del-restock="${escapeHtml(x.key)}">Hapus</button>`
+        : `<span class="muted">-</span>`}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="5" class="empty">Belum ada riwayat restock.</td></tr>`;
 }
 
 
@@ -780,6 +787,30 @@ function bind() {
 
     if (e.target.closest("#new-service") || e.target.closest("#new-service-3")) {
       resetServiceForm(); switchPage("kasir"); return;
+    }
+
+    const deleteRestockBtn = e.target.closest("[data-del-restock]");
+    if (deleteRestockBtn) {
+      const key = deleteRestockBtn.dataset.delRestock;
+      const row = state.restocks.find(x => String(x.key) === String(key));
+      if (!row || row.fromLedger) return;
+
+      const label = `${row.nama || "barang"} · ${row.qty} ${row.satuan || "pcs"}`;
+      if (!confirm(`Hapus restock ${label}?\\n\\nStok akan dikurangi kembali dan pengeluaran restock di pembukuan juga dihapus.`)) return;
+
+      deleteRestockBtn.disabled = true;
+      try {
+        const removed = await removeRestock(key);
+        state.restocks = state.restocks.filter(x => String(x.key) !== String(key));
+        renderRestock();
+        await loadAll();
+        view.toast(`Restock dihapus. Stok dikembalikan ${removed.qty} ${removed.satuan || "pcs"}.`, "success");
+      } catch (err) {
+        console.error("OnePrint remove restock:", err);
+        view.toast(`Restock tidak dihapus: ${err?.message || "periksa koneksi Firebase."}`, "error");
+        deleteRestockBtn.disabled = false;
+      }
+      return;
     }
 
     if (e.target.closest("#more-menu")) { showMoreMenu(); return; }

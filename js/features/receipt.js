@@ -186,7 +186,7 @@ export function buildReceipt(data, tipe = "nota") {
   const jasa = Array.isArray(data.jasa) ? data.jasa : [];
   const sparepart = Array.isArray(data.sparepart) ? data.sparepart : [];
   const tgl = new Date(data.tanggal || Date.now()).toLocaleDateString("id-ID");
-  const trackingUrl = `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(noNota)}`;
+  const trackingUrl = `https://oneprintservice.web.id/tracking.htr?tt=${encodeURIComponent(noNota)}`;
 
   const logoPath = "assets/logos.png";
 
@@ -238,7 +238,7 @@ export function buildReceipt(data, tipe = "nota") {
 <div style="display:flex;justify-content:space-between;align-items:center;gap:15px;">
 <div style="font-size:9px;line-height:1.5;flex:1;">
 <b>TRACKING SERVIS ONLINE</b><br>
-oneprintservice.web.id/tracking<br>
+oneprintservice.web.id/tracking.htr<br>
 Masukkan nomor tanda terima:<br>
 <b>TT-${esc(noNota)}</b><br>
 atau scan QR di samping.
@@ -260,7 +260,7 @@ export function printReceipt(data, tipe = "nota") {
   if (qr && window.QRCode) {
     qr.innerHTML = "";
     new window.QRCode(qr, {
-      text: `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(data.nomor || "")}`,
+      text: `https://oneprintservice.web.id/tracking.htr?tt=${encodeURIComponent(data.nomor || data.noNota || data.no_tanda_terima || data.tandaTerima || data.tt || "")}`,
       width: 110,
       height: 110
     });
