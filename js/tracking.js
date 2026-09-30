@@ -1,23 +1,32 @@
-import { findServiceByCode } from "./features/services.js";
+import { db } from "./core/firebase.js";
 
-const $ = (selector) => document.querySelector(selector);
+const $ = selector => document.querySelector(selector);
 
-const form = $("#form");
-const search = $("#search");
-const result = $("#result");
-const manualPanel = $("#manual-panel");
-const scanPanel = $("#scan-panel");
-const startScanButton = $("#start-scan");
-const stopScanButton = $("#stop-scan");
-const scannerBox = $("#scanner-box");
-const scanMessage = $("#scan-message");
+function normalizeCode(value = "") {
+  let text = String(value || "").trim();
+  if (!text) return "";
 
-let scanner = null;
-let scanning = false;
-let scanHandled = false;
+  // QR may contain the full public tracking URL.
+  try {
+    const url = new URL(text);
+    const params = url.searchParams;
+    text =
+      params.get("tt") ||
+      params.get("no") ||
+      params.get("nomor") ||
+      params.get("invoice") ||
+      params.get("id") ||
+      text;
+  } catch (_) {}
+
+  text = text.trim();
+  text = text.replace(/^.*[?#](?:tt|no|nomor|invoice|id)=/i, "");
+  text = text.replace(/^(TT|INV)[\s\-_:]*/i, "");
+  return text.trim();
+}
 
 function escapeHtml(value) {
-  return String(value ?? "-")
+  return String(value ?? "")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -25,431 +34,225 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function decodeMaybe(value) {
-  let text = String(value || "").trim();
-  for (let i = 0; i < 2; i++) {
-    try {
-      const decoded = decodeURIComponent(text);
-      if (decoded === text) break;
-      text = decoded;
-    } catch (_) {
-      break;
+function serviceLooksValid(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value) &&
+    Boolean(value.nomor || value.noNota || value.invoice || value.tandaTerima ||
+      value.status || value.pelanggan || value.merk || value.keluhan);
+}
+
+async function directLookup(code) {
+  const clean = normalizeCode(code);
+  if (!clean) return null;
+
+  const candidates = new Set([
+    clean,
+    `TT-${clean}`,
+    `INV-${clean}`
+  ]);
+
+  for (const candidate of candidates) {
+    for (const root of ["servis", "services", "service"]) {
+      const snap = await db.ref(`${root}/${candidate}`).once("value");
+      if (snap.exists() && serviceLooksValid(snap.val())) {
+        return { key: `${root}/${candidate}`, ...snap.val() };
+      }
     }
   }
-  return text.trim();
-}
 
-function normalizeTrackingCode(value) {
-  let raw = decodeMaybe(value);
-  if (!raw) return "";
+  // Legacy-safe fallback: read the service roots and compare all known
+  // identifier fields, not just the Firebase key.
+  for (const root of ["servis", "services", "service"]) {
+    const snap = await db.ref(root).once("value");
+    if (!snap.exists()) continue;
 
-  // QR may contain the full tracking URL.
-  try {
-    const url = new URL(raw, window.location.origin);
-    const params = url.searchParams;
-    const fromQuery =
-      params.get("tt") ||
-      params.get("no") ||
-      params.get("nota") ||
-      params.get("nomor") ||
-      params.get("invoice") ||
-      params.get("code");
-    if (fromQuery) raw = decodeMaybe(fromQuery);
-  } catch (_) {
-    // Not a URL; continue as plain text.
+    let found = null;
+    snap.forEach(child => {
+      if (found) return;
+      const value = child.val();
+      if (!serviceLooksValid(value)) return;
+
+      const identifiers = [
+        child.key,
+        value.nomor,
+        value.noNota,
+        value.invoice,
+        value.tandaTerima,
+        value.tt,
+        value.noTT,
+        value.nomorTT
+      ].filter(Boolean).map(normalizeCode);
+
+      if (identifiers.includes(clean)) {
+        found = { key: `${root}/${child.key}`, ...value };
+      }
+    });
+    if (found) return found;
   }
 
-  raw = raw
-    .replace(/^https?:\/\/[^/]+/i, "")
-    .replace(/^[/#?]+/, "")
-    .trim();
-
-  // Accept TT-xxxx, INV-xxxx and the bare service number.
-  const prefixed = raw.match(/(?:^|[\s=:\/])(?:TT|INV)\s*[-:]?\s*([A-Za-z0-9._-]+)/i);
-  if (prefixed) return prefixed[1].trim();
-
-  return raw.replace(/^(TT|INV)\s*[-:]?\s*/i, "").trim();
+  return null;
 }
 
-function displayNumber(service, fallback = "") {
-  const value =
-    service?.nomor ||
-    service?.noNota ||
-    service?.no_tanda_terima ||
-    service?.tandaTerima ||
-    service?.tt ||
-    service?.invoice ||
-    fallback ||
-    "-";
-  const text = String(value).trim();
-  return /^TT[-:\s]/i.test(text) || /^INV[-:\s]/i.test(text) ? text : `TT-${text}`;
+function serviceNumber(data, fallback) {
+  return data.nomor || data.noNota || data.tandaTerima || data.invoice || fallback;
 }
 
-function rupiah(value) {
-  return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
-}
-
-function formatDate(value) {
-  if (!value) return "-";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString("id-ID", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric"
-  });
-}
-
-function statusClass(status) {
-  return `status status-${String(status || "")
-    .toLowerCase()
-    .replaceAll(" ", "-")}`;
-}
-
-function renderLoading() {
-  result.innerHTML = `
-    <div class="track-loading">
-      <span class="track-spinner"></span>
-      <div>
-        <strong>Mencari data servis...</strong>
-        <small>Mohon tunggu sebentar.</small>
-      </div>
-    </div>`;
-}
-
-function renderEmpty(code) {
-  result.innerHTML = `
-    <div class="track-empty">
-      <div class="track-empty-icon">?</div>
-      <div>
-        <strong>Nomor servis tidak ditemukan</strong>
-        <p>${escapeHtml(code || "Nomor belum diisi")} belum ditemukan di data OnePrint.</p>
-        <small>Periksa nomor pada nota atau scan QR sekali lagi.</small>
-      </div>
-    </div>`;
-}
-
-function renderError() {
-  result.innerHTML = `
-    <div class="track-empty track-error">
-      <div class="track-empty-icon">!</div>
-      <div>
-        <strong>Data belum dapat dimuat</strong>
-        <p>Terjadi gangguan saat mengambil data servis.</p>
-        <small>Coba lagi beberapa saat lagi.</small>
-      </div>
-    </div>`;
-}
-
-function renderService(service, fallbackCode) {
-  const status = String(service.status || "-").trim();
-  const code = displayNumber(service, fallbackCode);
-  const device = [
-    service.merk,
-    service.model || service.tipe || service.perangkat
-  ].filter(Boolean).join(" ") || "-";
-  const serial = service.serial || service.noSerial || service.serialNumber || "";
-  const customer = service.pelanggan || service.namaPelanggan || service.nama || "-";
-  const technician = service.teknisi || "-";
-  const phone = service.telp || service.telepon || "";
-  const complaint = service.keluhan || "-";
-  const note = service.keterangan || service.catatan || "Belum ada keterangan tambahan.";
-
-  result.innerHTML = `
-    <article class="track-result-card">
-      <header class="track-result-head">
-        <div>
-          <span class="track-label">NOMOR TANDA TERIMA</span>
-          <h2>${escapeHtml(code)}</h2>
-          <small>Status servis terbaru</small>
-        </div>
-        <span class="${statusClass(status)}">${escapeHtml(status)}</span>
-      </header>
-
-      <div class="track-summary">
-        <div class="track-summary-main">
-          <span class="track-label">PERANGKAT</span>
-          <strong>${escapeHtml(device)}</strong>
-          ${serial ? `<small>Serial: ${escapeHtml(serial)}</small>` : ""}
-        </div>
-        <div class="track-summary-price">
-          <span class="track-label">TOTAL</span>
-          <strong>${rupiah(service.total)}</strong>
-        </div>
-      </div>
-
-      <div class="track-info-grid">
-        <div>
-          <span>Pelanggan</span>
-          <b>${escapeHtml(customer)}</b>
-          ${phone ? `<small>${escapeHtml(phone)}</small>` : ""}
-        </div>
-        <div>
-          <span>Tanggal masuk</span>
-          <b>${escapeHtml(formatDate(service.tanggal))}</b>
-        </div>
-        <div>
-          <span>Teknisi</span>
-          <b>${escapeHtml(technician)}</b>
-        </div>
-        <div>
-          <span>Status</span>
-          <b>${escapeHtml(status)}</b>
-        </div>
-      </div>
-
-      <div class="track-detail">
-        <div>
-          <span class="track-label">KELUHAN / PEKERJAAN</span>
-          <p>${escapeHtml(complaint).replaceAll("\n", "<br>")}</p>
-        </div>
-        <div>
-          <span class="track-label">KETERANGAN TERBARU</span>
-          <p>${escapeHtml(note).replaceAll("\n", "<br>")}</p>
-        </div>
-      </div>
-    </article>`;
-}
-
-async function lookup(rawValue) {
-  const code = normalizeTrackingCode(rawValue);
-  if (!code) {
-    result.innerHTML = `
-      <div class="track-empty">
-        <div class="track-empty-icon">i</div>
-        <div>
-          <strong>Nomor belum diisi</strong>
-          <p>Masukkan nomor tanda terima atau scan QR pada nota.</p>
-        </div>
-      </div>`;
-    return null;
-  }
-
-  search.value = code;
-  renderLoading();
-
-  try {
-    // Keep the proven OnePrint service lookup as the single source of truth.
-    const service = await findServiceByCode(code);
-    if (!service) {
-      renderEmpty(code);
-      return null;
-    }
-    renderService(service, code);
-    return service;
-  } catch (error) {
-    console.error("OnePrint tracking lookup:", error);
-    renderError();
-    return null;
-  }
-}
-
-function setMethod(method) {
-  const manual = method === "manual";
-
-  document.querySelectorAll(".track-method").forEach((button) => {
-    const active = button.dataset.method === method;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-selected", String(active));
-  });
-
-  manualPanel.hidden = !manual;
-  scanPanel.hidden = manual;
-  manualPanel.classList.toggle("active", manual);
-  scanPanel.classList.toggle("active", !manual);
-
-  if (manual) {
-    stopScanner();
-    setTimeout(() => search.focus(), 60);
-  }
-}
-
-function setScanMessage(message, type = "") {
-  scanMessage.textContent = message;
-  scanMessage.dataset.type = type;
-}
-
-function loadScannerLibrary() {
-  if (window.Html5Qrcode) return Promise.resolve(window.Html5Qrcode);
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-tracking-scanner]');
-    if (existing) {
-      existing.addEventListener("load", () => resolve(window.Html5Qrcode), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Scanner library gagal dimuat.")), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
-    script.async = true;
-    script.dataset.trackingScanner = "1";
-    script.onload = () => window.Html5Qrcode ? resolve(window.Html5Qrcode) : reject(new Error("Html5Qrcode tidak tersedia."));
-    script.onerror = () => reject(new Error("Scanner library gagal dimuat."));
-    document.head.appendChild(script);
-  });
-}
-
-async function startScanner() {
-  if (scanning) return;
-
-  if (!window.isSecureContext && location.hostname !== "localhost") {
-    setScanMessage("Kamera hanya bisa dipakai melalui HTTPS. Buka tracking lewat https://oneprintservice.web.id.", "error");
+function renderResult(data, searchedCode) {
+  if (!data) {
+    $("#result").innerHTML = `<div class="empty">Nomor servis <strong>${escapeHtml(searchedCode)}</strong> tidak ditemukan.</div>`;
     return;
   }
 
-  startScanButton.disabled = true;
-  scannerBox.hidden = false;
-  setScanMessage("Meminta izin kamera...");
+  const nomor = serviceNumber(data, searchedCode);
+  const total = Number(data.total ?? data.grandTotal ?? data.totalHarga ?? 0);
 
+  $("#result").innerHTML = `
+    <div class="track-card">
+      <div class="track-head">
+        <div><small>Nomor tanda terima</small><h2>${escapeHtml(String(nomor).startsWith("TT-") ? nomor : `TT-${nomor}`)}</h2></div>
+        <span class="status">${escapeHtml(data.status || "BELUM ADA STATUS")}</span>
+      </div>
+      <div class="track-grid">
+        <div><small>Pelanggan</small><b>${escapeHtml(data.pelanggan || data.namaPelanggan || "-")}</b></div>
+        <div><small>Perangkat</small><b>${escapeHtml(data.merk || data.tipe || data.device || "-")}</b></div>
+        <div><small>Serial / Barcode</small><b>${escapeHtml(data.serial || data.printerId || data.barcode || "-")}</b></div>
+        <div><small>Teknisi</small><b>${escapeHtml(data.teknisi || data.technician || "-")}</b></div>
+        <div><small>Tanggal masuk</small><b>${escapeHtml(data.tanggal ? new Date(data.tanggal).toLocaleDateString("id-ID") : "-")}</b></div>
+        <div><small>Total</small><b>Rp ${total.toLocaleString("id-ID")}</b></div>
+      </div>
+      <div class="track-note">
+        <small>Keluhan</small><p>${escapeHtml(data.keluhan || "-")}</p>
+      </div>
+      <div class="track-note">
+        <small>Keterangan terbaru</small><p>${escapeHtml(data.keterangan || data.catatan || "Belum ada keterangan tambahan.")}</p>
+      </div>
+    </div>`;
+}
+
+let scanner = null;
+let scanning = false;
+
+async function stopCamera() {
+  if (!scanner) return;
+  try { await scanner.stop(); } catch (_) {}
+  try { scanner.clear(); } catch (_) {}
+  scanner = null;
+  scanning = false;
+}
+
+function extractQrValue(text) {
+  const value = String(text || "").trim();
+  if (!value) return "";
+
+  // If it is a tracking URL, navigate to it. This makes QR scanning work
+  // exactly like opening the QR from another camera/scanner app.
   try {
-    const Html5Qrcode = await loadScannerLibrary();
+    const url = new URL(value);
+    const isTrackingPage =
+      /tracking\.html?$/i.test(url.pathname) ||
+      /oneprintservice\.web\.id$/i.test(url.hostname);
 
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error("Browser tidak menyediakan akses kamera.");
+    if (isTrackingPage && url.searchParams.toString()) {
+      return { url: url.href, code: normalizeCode(url.href) };
     }
+  } catch (_) {}
 
-    const reader = document.getElementById("qr-reader");
-    if (!reader) throw new Error("Area kamera tidak ditemukan.");
+  return { url: null, code: normalizeCode(value) };
+}
 
-    // Clear any previous scanner DOM before creating a new instance.
-    reader.innerHTML = "";
-    scanner = new Html5Qrcode("qr-reader");
-    scanHandled = false;
+async function startCamera() {
+  if (!window.Html5Qrcode) {
+    $("#camera-status").textContent = "Scanner kamera belum termuat. Muat ulang halaman lalu coba lagi.";
+    return;
+  }
 
-    const config = {
-      fps: 10,
-      qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const size = Math.max(
-          180,
-          Math.min(300, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.72))
-        );
-        return { width: size, height: size };
-      },
-      aspectRatio: 1,
-      disableFlip: false
-    };
+  await stopCamera();
+  $("#scan-panel").hidden = false;
+  $("#camera-status").textContent = "Meminta izin kamera...";
 
-    const onSuccess = async (decodedText) => {
-      if (!scanning || scanHandled) return;
-      scanHandled = true;
+  scanner = new Html5Qrcode("track-reader");
 
-      const code = normalizeTrackingCode(decodedText);
-      setScanMessage("QR terbaca. Mencari data servis...", "success");
-      await stopScanner();
+  const onSuccess = async decodedText => {
+    const parsed = extractQrValue(decodedText);
+    if (!parsed?.code) return;
 
-      if (!code) {
-        scanHandled = false;
-        scannerBox.hidden = false;
-        setScanMessage("QR terbaca, tetapi tidak berisi nomor tracking OnePrint.", "error");
+    await stopCamera();
+    $("#scan-panel").hidden = true;
+    $("#search").value = parsed.code;
+
+    // A QR containing the actual tracking URL opens that URL directly.
+    if (parsed.url) {
+      const current = new URL(location.href);
+      const target = new URL(parsed.url, location.href);
+      if (target.href !== current.href) {
+        location.href = target.href;
         return;
       }
-
-      setMethod("manual");
-      search.value = code;
-      await lookup(code);
-    };
-
-    const onFailure = () => {
-      // Continuous scan: frame misses are normal and intentionally ignored.
-    };
-
-    try {
-      await scanner.start({ facingMode: { exact: "environment" } }, config, onSuccess, onFailure);
-    } catch (firstError) {
-      console.warn("OnePrint camera facingMode start failed:", firstError);
-
-      // Some Android browsers reject exact facingMode. Retry with a plain
-      // environment request before falling back to enumerated camera IDs.
-      try {
-        await scanner.stop().catch(() => {});
-        await scanner.clear().catch(() => {});
-      } catch (_) {}
-
-      scanner = new Html5Qrcode("qr-reader");
-
-      try {
-        await scanner.start({ facingMode: "environment" }, config, onSuccess, onFailure);
-      } catch (secondError) {
-        console.warn("OnePrint camera environment start failed:", secondError);
-
-        try {
-          await scanner.stop().catch(() => {});
-          await scanner.clear().catch(() => {});
-        } catch (_) {}
-
-        const cameras = await Html5Qrcode.getCameras();
-        if (!cameras?.length) throw new Error("Kamera tidak ditemukan atau izin kamera ditolak.");
-
-        const preferred =
-          cameras.find((camera) => /back|rear|environment|belakang/i.test(camera.label)) ||
-          cameras[cameras.length - 1];
-
-        scanner = new Html5Qrcode("qr-reader");
-        await scanner.start(preferred.id, config, onSuccess, onFailure);
-      }
     }
 
-    scanning = true;
-    setScanMessage("Kamera aktif. Arahkan QR nota ke kotak putih.");
+    await runTracking(parsed.code);
+  };
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 240, height: 240 },
+    aspectRatio: 1
+  };
+
+  try {
+    await scanner.start({ facingMode: { exact: "environment" } }, config, onSuccess, () => {});
+  } catch (firstError) {
+    try {
+      await scanner.start({ facingMode: "environment" }, config, onSuccess, () => {});
+    } catch (secondError) {
+      await stopCamera();
+      $("#camera-status").textContent =
+        "Kamera tidak dapat diaktifkan. Pastikan izin kamera diberikan dan halaman dibuka melalui HTTPS.";
+      console.error("Tracking camera error", firstError, secondError);
+    }
+  }
+
+  if (scanning) $("#camera-status").textContent = "Kamera aktif. Arahkan ke QR pada nota.";
+  scanning = true;
+}
+
+async function runTracking(value = $("#search").value) {
+  const clean = normalizeCode(value);
+  if (!clean) {
+    $("#result").innerHTML = `<div class="empty">Masukkan nomor tanda terima terlebih dahulu.</div>`;
+    return;
+  }
+
+  $("#search").value = clean;
+  $("#result").innerHTML = `<div class="loading">Mencari data servis...</div>`;
+
+  try {
+    const data = await directLookup(clean);
+    renderResult(data, clean);
   } catch (error) {
-    console.error("OnePrint tracking camera:", error);
-    await stopScanner();
-    setScanMessage(
-      "Kamera belum bisa dibuka. Izinkan kamera untuk browser ini, lalu tekan Buka kamera lagi.",
-      "error"
-    );
-  } finally {
-    startScanButton.disabled = false;
+    console.error("Tracking lookup error", error);
+    $("#result").innerHTML = `<div class="empty">Gagal mengambil data tracking. Periksa koneksi lalu coba lagi.</div>`;
   }
 }
 
-async function stopScanner() {
-  scanning = false;
-  scanHandled = false;
-
-  if (scanner) {
-    try {
-      await scanner.stop();
-    } catch (_) {}
-    try {
-      await scanner.clear();
-    } catch (_) {}
-  }
-
-  scanner = null;
-  scannerBox.hidden = true;
-}
-
-document.querySelectorAll(".track-method").forEach((button) => {
-  button.addEventListener("click", () => setMethod(button.dataset.method));
-});
-
-form.addEventListener("submit", (event) => {
+$("#form").addEventListener("submit", event => {
   event.preventDefault();
-  lookup(search.value);
+  stopCamera();
+  $("#scan-panel").hidden = true;
+  runTracking();
 });
 
-startScanButton.addEventListener("click", startScanner);
-stopScanButton.addEventListener("click", () => stopScanner());
-
-window.addEventListener("pagehide", () => {
-  stopScanner();
+$("#open-camera").addEventListener("click", startCamera);
+$("#close-camera").addEventListener("click", async () => {
+  await stopCamera();
+  $("#scan-panel").hidden = true;
 });
 
-const params = new URLSearchParams(window.location.search);
-const initialCode =
-  params.get("tt") ||
-  params.get("no") ||
-  params.get("nota") ||
-  params.get("nomor") ||
-  params.get("invoice") ||
-  params.get("code") ||
-  "";
+const initial = new URLSearchParams(location.search).get("tt") ||
+  new URLSearchParams(location.search).get("no") ||
+  new URLSearchParams(location.search).get("nomor") ||
+  new URLSearchParams(location.search).get("invoice");
 
-if (initialCode) {
-  search.value = initialCode;
-  lookup(initialCode);
-} else {
-  setMethod("manual");
+if (initial) {
+  $("#search").value = normalizeCode(initial);
+  runTracking(initial);
 }
