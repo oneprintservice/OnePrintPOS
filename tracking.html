@@ -1,1 +1,83 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="assets/logos.png"><title>Tracking Servis · OnePrint</title><link rel="stylesheet" href="css/app.css"><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script></head><body class="public-body"><main class="track-page"><a class="back-link" href="index.html">← OnePrint Service</a><div class="brand-large"><img src="assets/logos.png"><span>TRACKING<br><small>SERVICE</small></span></div><div class="track-intro"><span class="eyebrow">STATUS PERBAIKAN</span><h1>Lacak perangkat Anda.</h1><p class="muted">Masukkan nomor tanda terima untuk melihat status servis terbaru.</p></div><form id="form" class="track-form"><input id="search" placeholder="Contoh: TT-260922123456"><button class="primary">Cari</button></form><div id="result"></div></main><script type="module" src="js/tracking.js?v=20260930-trackingfix2"></script></body></html>
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="icon" href="assets/logos.png">
+  <title>Tracking Servis · OnePrint</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body class="public-body tracking-body">
+  <main class="track-page track-page-enhanced">
+    <a class="back-link track-back" href="index.html">← OnePrint Service</a>
+
+    <section class="track-hero">
+      <div class="brand-large">
+        <img src="assets/logos.png" alt="OnePrint Service">
+        <span>TRACKING<br><small>SERVICE</small></span>
+      </div>
+      <span class="eyebrow">STATUS PERBAIKAN</span>
+      <h1>Lacak perangkat Anda.</h1>
+      <p class="muted">Masukkan nomor tanda terima atau scan QR pada nota untuk melihat status servis terbaru.</p>
+    </section>
+
+    <section class="track-search-panel">
+      <div class="track-methods" role="tablist" aria-label="Metode pencarian tracking">
+        <button type="button" class="track-method active" data-method="manual" role="tab" aria-selected="true">
+          <span>⌨</span>
+          <strong>Ketik nomor</strong>
+          <small>TT / INV</small>
+        </button>
+        <button type="button" class="track-method" data-method="scan" role="tab" aria-selected="false">
+          <span>▣</span>
+          <strong>Scan QR</strong>
+          <small>Pakai kamera</small>
+        </button>
+      </div>
+
+      <div id="manual-panel" class="track-method-panel active">
+        <form id="form" class="track-form">
+          <label class="track-input-wrap">
+            <span>Nomor tanda terima</span>
+            <input id="search" autocomplete="off" inputmode="text" placeholder="Contoh: TT-260922123456" aria-label="Nomor tanda terima">
+          </label>
+          <button class="primary track-search-btn" type="submit">Cari</button>
+        </form>
+        <p class="track-help">Bisa mengetik <b>TT-...</b>, <b>INV-...</b>, atau nomor tanpa awalan.</p>
+      </div>
+
+      <div id="scan-panel" class="track-method-panel" hidden>
+        <div class="scan-head">
+          <div>
+            <strong>Scan QR pada nota</strong>
+            <p>Izinkan akses kamera, lalu arahkan QR ke dalam kotak.</p>
+          </div>
+          <button type="button" id="start-scan" class="primary">Buka kamera</button>
+        </div>
+
+        <div id="scanner-box" class="scanner-box" hidden>
+          <div id="qr-reader"></div>
+          <div class="scanner-guide"><span></span></div>
+          <button type="button" id="stop-scan" class="ghost scanner-stop">Tutup kamera</button>
+        </div>
+
+        <div id="scan-message" class="scan-message" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <div id="result" aria-live="polite"></div>
+
+    <footer class="track-footer">
+      <span>OnePrint Service</span>
+      <span>•</span>
+      <span>Tracking servis online</span>
+    </footer>
+  </main>
+
+  <script type="module" src="js/tracking.js?v=20260930-ui-camera"></script>
+</body>
+</html>

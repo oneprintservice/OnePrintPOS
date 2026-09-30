@@ -1,127 +1,22 @@
-const $ = selector => document.querySelector(selector);
+import { getService } from "./features/services.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBcyS36JnJNGZPdSxd_g9UmCq4BJRiG2rA",
-  authDomain: "oneprintservice-db.firebaseapp.com",
-  databaseURL: "https://oneprintservice-db-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "oneprintservice-db",
-  storageBucket: "oneprintservice-db.firebasestorage.app",
-  messagingSenderId: "330853999249",
-  appId: "1:330853999249:web:4503ed115d2694d9cb5530"
-};
+const $ = (selector) => document.querySelector(selector);
 
-if (!window.firebase) {
-  throw new Error("Firebase SDK belum dimuat.");
-}
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const form = $("#form");
+const search = $("#search");
+const result = $("#result");
+const manualPanel = $("#manual-panel");
+const scanPanel = $("#scan-panel");
+const startScanButton = $("#start-scan");
+const stopScanButton = $("#stop-scan");
+const scannerBox = $("#scanner-box");
+const scanMessage = $("#scan-message");
 
-function normalizeCode(value) {
-  return String(value ?? "")
-    .trim()
-    .replace(/^https?:\/\/[^/]+\/tracking(?:\.htr|\.html)?\?tt=/i, "")
-    .replace(/^(TT|INV)[-:\s]*/i, "")
-    .trim()
-    .toUpperCase();
-}
+let scanner = null;
+let scanning = false;
 
-function serviceLooksValid(value) {
-  return value && typeof value === "object" && !Array.isArray(value) &&
-    Boolean(
-      value.nomor || value.noNota || value.no_tanda_terima ||
-      value.tandaTerima || value.tt || value.invoice ||
-      value.pelanggan || value.status || value.merk || value.keluhan
-    );
-}
-
-function collectServices(node, path = "", out = []) {
-  if (!node || typeof node !== "object") return out;
-  if (serviceLooksValid(node)) {
-    out.push({ key: path, ...node });
-    return out;
-  }
-  Object.entries(node).forEach(([key, value]) => {
-    collectServices(value, path ? `${path}/${key}` : key, out);
-  });
-  return out;
-}
-
-function candidateValues(row) {
-  const key = String(row.key || "");
-  const leaf = key.split("/").pop() || key;
-  return [
-    key,
-    leaf,
-    row.nomor,
-    row.noNota,
-    row.no_tanda_terima,
-    row.tandaTerima,
-    row.tt,
-    row.invoice
-  ].filter(v => v !== undefined && v !== null).map(normalizeCode);
-}
-
-async function readServices() {
-  const roots = ["servis", "services", "service"];
-  const results = await Promise.allSettled(
-    roots.map(async root => {
-      const snap = await db.ref(root).once("value");
-      return snap.exists() ? collectServices(snap.val(), root) : [];
-    })
-  );
-
-  const errors = results.filter(x => x.status === "rejected");
-  if (errors.length && !results.some(x => x.status === "fulfilled")) {
-    throw errors[0].reason;
-  }
-
-  const rows = results
-    .filter(x => x.status === "fulfilled")
-    .flatMap(x => x.value);
-
-  // Same service can exist in legacy roots; prefer the newest record.
-  const map = new Map();
-  for (const row of rows) {
-    const identity = normalizeCode(
-      row.nomor || row.noNota || row.no_tanda_terima ||
-      row.tandaTerima || row.tt || row.invoice || row.key
-    );
-    const old = map.get(identity);
-    const rowTime = Date.parse(row.updatedAt || row.tanggal || "") || 0;
-    const oldTime = Date.parse(old?.updatedAt || old?.tanggal || "") || 0;
-    if (!old || rowTime >= oldTime) map.set(identity, row);
-  }
-  return [...map.values()];
-}
-
-async function findServiceByCode(code) {
-  const wanted = normalizeCode(code);
-  if (!wanted) return null;
-
-  // Fast path for the normal database structure.
-  for (const root of ["servis", "services", "service"]) {
-    for (const key of [wanted, `TT-${wanted}`, `INV-${wanted}`]) {
-      const snap = await db.ref(`${root}/${key}`).once("value");
-      if (snap.exists() && serviceLooksValid(snap.val())) {
-        return { key: `${root}/${key}`, ...snap.val() };
-      }
-    }
-  }
-
-  const rows = await readServices();
-  return rows.find(row => candidateValues(row).includes(wanted)) || null;
-}
-
-function displayNumber(service, fallback = "") {
-  const value =
-    service?.nomor || service?.noNota || service?.no_tanda_terima ||
-    service?.tandaTerima || service?.tt || service?.invoice || fallback || "-";
-  const text = String(value).trim();
-  return /^TT[-:\s]/i.test(text) ? text : `TT-${text}`;
-}
-
-function esc(value) {
-  return String(value ?? "")
+function escapeHtml(value) {
+  return String(value ?? "-")
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
@@ -129,53 +24,319 @@ function esc(value) {
     .replaceAll("'", "&#039;");
 }
 
-async function run() {
-  const value = $("#search").value.trim();
-  if (!value) {
-    $("#result").innerHTML = "<div class='empty'>Masukkan nomor tanda terima terlebih dahulu.</div>";
-    return;
-  }
-
-  $("#result").innerHTML = "<div class='loading'>Mencari...</div>";
+function cleanCode(value) {
+  let raw = String(value || "").trim();
+  if (!raw) return "";
 
   try {
-    const service = await findServiceByCode(value);
+    raw = decodeURIComponent(raw);
+  } catch (_) {}
 
-    if (!service) {
-      $("#result").innerHTML =
-        `<div class='empty'>Nomor tanda terima <b>${esc(value)}</b> tidak ditemukan.</div>`;
-      return;
-    }
+  // QR nota OnePrint biasanya berisi URL tracking?tt=...
+  try {
+    const url = new URL(raw);
+    const fromQuery =
+      url.searchParams.get("tt") ||
+      url.searchParams.get("nomor") ||
+      url.searchParams.get("invoice") ||
+      url.searchParams.get("code");
+    if (fromQuery) raw = fromQuery;
+  } catch (_) {}
 
-    $("#result").innerHTML = `<div class="track-card">
-      <div class="track-head">
-        <div><small>Nomor tanda terima</small><h2>${esc(displayNumber(service, value))}</h2></div>
-        <span class="status">${esc(service.status || "-")}</span>
-      </div>
-      <div class="track-grid">
-        <div><small>Pelanggan</small><b>${esc(service.pelanggan || service.nama || "-")}</b></div>
-        <div><small>Perangkat</small><b>${esc(service.merk || service.tipe || "-")}</b></div>
-        <div><small>Teknisi</small><b>${esc(service.teknisi || "-")}</b></div>
-        <div><small>Total</small><b>Rp ${Number(service.total || 0).toLocaleString("id-ID")}</b></div>
-      </div>
-      <div class="track-note">
-        <small>Keterangan</small>
-        <p>${esc(service.keterangan || service.catatan || "Belum ada keterangan tambahan.")}</p>
+  // Tetap toleran terhadap QR yang hanya berisi TT-xxxx / INV-xxxx
+  const prefixed = raw.match(/\b(?:TT|INV)\s*[-:#]?\s*([A-Za-z0-9_-]+)\b/i);
+  if (prefixed) return prefixed[1].trim();
+
+  return raw
+    .replace(/^https?:\/\/[^/]+/i, "")
+    .replace(/^[/#?]+/, "")
+    .trim();
+}
+
+function displayCode(service, fallback) {
+  const nomor = service?.nomor || fallback || "-";
+  return /^TT-/i.test(nomor) || /^INV-/i.test(nomor) ? nomor : `TT-${nomor}`;
+}
+
+function rupiah(value) {
+  return `Rp ${Number(value || 0).toLocaleString("id-ID")}`;
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function statusClass(status) {
+  return `status status-${String(status || "")
+    .toLowerCase()
+    .replaceAll(" ", "-")}`;
+}
+
+function renderLoading() {
+  result.innerHTML = `
+    <div class="track-loading">
+      <span class="track-spinner"></span>
+      <div>
+        <strong>Mencari data servis...</strong>
+        <small>Mohon tunggu sebentar.</small>
       </div>
     </div>`;
-  } catch (err) {
-    console.error("OnePrint tracking:", err);
-    $("#result").innerHTML =
-      "<div class='empty'>Tracking gagal dimuat. Periksa koneksi atau izin akses database.</div>";
+}
+
+function renderEmpty(code) {
+  result.innerHTML = `
+    <div class="track-empty">
+      <div class="track-empty-icon">?</div>
+      <div>
+        <strong>Nomor servis tidak ditemukan</strong>
+        <p>${escapeHtml(code || "Nomor belum diisi")} belum ditemukan di data OnePrint.</p>
+        <small>Periksa kembali nomor pada nota, atau scan ulang QR.</small>
+      </div>
+    </div>`;
+}
+
+function renderError() {
+  result.innerHTML = `
+    <div class="track-empty track-error">
+      <div class="track-empty-icon">!</div>
+      <div>
+        <strong>Data belum dapat dimuat</strong>
+        <p>Terjadi gangguan saat mengambil data servis.</p>
+        <small>Coba lagi beberapa saat lagi.</small>
+      </div>
+    </div>`;
+}
+
+function renderService(service, fallbackCode) {
+  const status = String(service.status || "-").trim();
+  const code = displayCode(service, fallbackCode);
+  const device = [service.merk, service.model].filter(Boolean).join(" ") || service.perangkat || "-";
+  const serial = service.serial || service.noSerial || service.serialNumber || "";
+  const customer = service.pelanggan || service.namaPelanggan || "-";
+  const technician = service.teknisi || "-";
+  const phone = service.telp || service.telepon || "";
+  const complaint = service.keluhan || "-";
+  const note = service.keterangan || service.catatan || "Belum ada keterangan tambahan.";
+
+  result.innerHTML = `
+    <article class="track-result-card">
+      <header class="track-result-head">
+        <div>
+          <span class="track-label">NOMOR TANDA TERIMA</span>
+          <h2>${escapeHtml(code)}</h2>
+          <small>Diperbarui dari data servis OnePrint</small>
+        </div>
+        <span class="${statusClass(status)}">${escapeHtml(status)}</span>
+      </header>
+
+      <div class="track-summary">
+        <div class="track-summary-main">
+          <span class="track-label">PERANGKAT</span>
+          <strong>${escapeHtml(device)}</strong>
+          ${serial ? `<small>Serial: ${escapeHtml(serial)}</small>` : ""}
+        </div>
+        <div class="track-summary-price">
+          <span class="track-label">TOTAL</span>
+          <strong>${rupiah(service.total)}</strong>
+        </div>
+      </div>
+
+      <div class="track-info-grid">
+        <div>
+          <span>Pelanggan</span>
+          <b>${escapeHtml(customer)}</b>
+          ${phone ? `<small>${escapeHtml(phone)}</small>` : ""}
+        </div>
+        <div>
+          <span>Tanggal masuk</span>
+          <b>${escapeHtml(formatDate(service.tanggal))}</b>
+        </div>
+        <div>
+          <span>Teknisi</span>
+          <b>${escapeHtml(technician)}</b>
+        </div>
+        <div>
+          <span>Status</span>
+          <b>${escapeHtml(status)}</b>
+        </div>
+      </div>
+
+      <div class="track-detail">
+        <div>
+          <span class="track-label">KELUHAN / PEKERJAAN</span>
+          <p>${escapeHtml(complaint).replaceAll("\\n", "<br>")}</p>
+        </div>
+        <div>
+          <span class="track-label">KETERANGAN TERBARU</span>
+          <p>${escapeHtml(note).replaceAll("\\n", "<br>")}</p>
+        </div>
+      </div>
+    </article>`;
+}
+
+async function lookup(rawValue) {
+  const code = cleanCode(rawValue);
+  if (!code) {
+    result.innerHTML = `
+      <div class="track-empty">
+        <div class="track-empty-icon">i</div>
+        <div>
+          <strong>Nomor belum diisi</strong>
+          <p>Masukkan nomor tanda terima atau scan QR pada nota.</p>
+        </div>
+      </div>`;
+    return null;
+  }
+
+  search.value = /^TT-|^INV-/i.test(String(rawValue).trim())
+    ? String(rawValue).trim()
+    : code;
+
+  renderLoading();
+
+  try {
+    const service = await getService(code);
+    if (!service) {
+      renderEmpty(code);
+      return null;
+    }
+    renderService(service, code);
+    return service;
+  } catch (error) {
+    console.error("Tracking lookup failed:", error);
+    renderError();
+    return null;
   }
 }
 
-const params = new URLSearchParams(location.search);
-const initialCode = params.get("tt") || params.get("no") || params.get("nota") || "";
-$("#search").value = initialCode;
-$("#form").addEventListener("submit", event => {
-  event.preventDefault();
-  run();
+function setMethod(method) {
+  document.querySelectorAll(".track-method").forEach((button) => {
+    const active = button.dataset.method === method;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+
+  const manual = method === "manual";
+  manualPanel.classList.toggle("active", manual);
+  scanPanel.classList.toggle("active", !manual);
+  manualPanel.hidden = !manual;
+  scanPanel.hidden = manual;
+
+  if (manual) {
+    stopScanner();
+    setTimeout(() => search.focus(), 50);
+  }
+}
+
+async function startScanner() {
+  if (scanning) return;
+
+  if (!window.Html5Qrcode) {
+    scanMessage.textContent = "Modul kamera belum siap. Muat ulang halaman lalu coba lagi.";
+    return;
+  }
+
+  scannerBox.hidden = false;
+  scanMessage.textContent = "Meminta izin kamera...";
+  startScanButton.disabled = true;
+
+  try {
+    scanner = new window.Html5Qrcode("qr-reader");
+
+    const config = {
+      fps: 10,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.68);
+        return { width: size, height: size };
+      },
+      aspectRatio: 1
+    };
+
+    const onSuccess = async (decodedText) => {
+      const code = cleanCode(decodedText);
+      if (!code || scanning === false) return;
+
+      scanMessage.textContent = "QR terbaca. Mencari data servis...";
+      await stopScanner();
+      setMethod("manual");
+      search.value = /^TT-|^INV-/i.test(code) ? code : code;
+      await lookup(code);
+    };
+
+    const onFailure = () => {
+      // Jangan menampilkan error setiap frame; scanner memang terus mencoba.
+    };
+
+    try {
+      await scanner.start({ facingMode: "environment" }, config, onSuccess, onFailure);
+    } catch (_) {
+      const cameras = await window.Html5Qrcode.getCameras();
+      const backCamera =
+        cameras.find((camera) => /back|rear|environment/i.test(camera.label)) ||
+        cameras[0];
+
+      if (!backCamera) throw new Error("Kamera tidak ditemukan.");
+
+      await scanner.start(backCamera.id, config, onSuccess, onFailure);
+    }
+
+    scanning = true;
+    scanMessage.textContent = "Arahkan QR ke dalam kotak.";
+  } catch (error) {
+    console.error("Camera start failed:", error);
+    scanner = null;
+    scanning = false;
+    scannerBox.hidden = true;
+    scanMessage.textContent =
+      "Kamera tidak dapat dibuka. Pastikan izin kamera diizinkan dan halaman dibuka melalui HTTPS.";
+  } finally {
+    startScanButton.disabled = false;
+  }
+}
+
+async function stopScanner() {
+  if (!scanner) {
+    scanning = false;
+    scannerBox.hidden = true;
+    return;
+  }
+
+  scanning = false;
+  try {
+    await scanner.stop();
+    await scanner.clear();
+  } catch (error) {
+    console.warn("Camera stop:", error);
+  }
+  scanner = null;
+  scannerBox.hidden = true;
+}
+
+document.querySelectorAll(".track-method").forEach((button) => {
+  button.addEventListener("click", () => setMethod(button.dataset.method));
 });
 
-if (initialCode) run();
+form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  lookup(search.value);
+});
+
+startScanButton.addEventListener("click", startScanner);
+stopScanButton.addEventListener("click", stopScanner);
+
+window.addEventListener("pagehide", stopScanner);
+
+const initialCode = new URLSearchParams(location.search).get("tt");
+if (initialCode) {
+  search.value = initialCode;
+  lookup(initialCode);
+} else {
+  setMethod("manual");
+}

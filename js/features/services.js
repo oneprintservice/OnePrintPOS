@@ -5,7 +5,7 @@ const TERMINAL_STATUSES = new Set(["DIAMBIL", "CANCEL"]);
 
 function looksLikeService(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return Boolean(value.nomor || value.noNota || value.no_tanda_terima || value.tandaTerima || value.pelanggan || value.status || value.merk || value.keluhan || value.telp || value.serial);
+  return Boolean(value.nomor || value.pelanggan || value.status || value.merk || value.keluhan || value.telp || value.serial);
 }
 
 function collectServices(node, path = "", out = []) {
@@ -56,32 +56,9 @@ export async function getService(key) {
     if (snap.exists() && looksLikeService(snap.val())) return { key: directPath, ...snap.val() };
   }
   const rows = await listServices();
-  const candidates = new Set([
-    String(key || "").trim(),
-    clean,
-    clean.replace(/^(TT|INV)[-:\s]*/i, ""),
-    `TT-${clean}`,
-    `INV-${clean}`
-  ]);
-  return rows.find(row => {
-    const rowKey = String(row.key || "");
-    const rowLeaf = rowKey.split("/").pop() || rowKey;
-    const normalizedLeaf = rowLeaf.replace(/^(TT|INV)[-:\s]*/i, "");
-    const numbers = [
-      row.nomor,
-      row.noNota,
-      row.no_tanda_terima,
-      row.tandaTerima,
-      row.tt,
-      row.invoice
-    ].filter(v => v !== undefined && v !== null).map(v => String(v).trim());
-
-    return candidates.has(rowKey) ||
-      candidates.has(rowLeaf) ||
-      candidates.has(normalizedLeaf) ||
-      numbers.some(value => candidates.has(value) ||
-        candidates.has(value.replace(/^(TT|INV)[-:\s]*/i, "")));
-  }) || null;
+  return rows.find(row =>
+    row.key === key || row.key === clean || row.nomor === clean || row.nomor === key
+  ) || null;
 }
 
 export async function findServiceByCode(code) {
