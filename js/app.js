@@ -8,7 +8,7 @@ import {
 } from "./features/services.js";
 import { printReceipt } from "./features/receipt.js?v=20260923-printfix";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, deleteRestock } from "./features/restock.js";
+import { createRestock, listRestocks, deleteRestock, deleteRestockLedgerOnly } from "./features/restock.js";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -126,13 +126,15 @@ async function loadAll() {
     .filter(x => !knownRestockIds.has(String(x.referensi || x.key)))
     .map(x => ({
       key: x.referensi || x.key,
+      _ledgerKey: x.key,
       tanggal: x.tanggal,
       nama: String(x.keterangan || "Restock").replace(/^Restock\\s*/i, "") || "Restock",
       supplier: x.supplier || "",
       qty: x.qty ?? "-",
       satuan: x.qty == null ? "" : (x.satuan || "pcs"),
       total: Number(x.jumlah || x.total || 0),
-      fromLedger: true
+      fromLedger: true,
+      ledgerOnly: true
     }));
   state.restocks = [...state.restocks, ...ledgerRestocks]
     .sort((a, b) => (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0));
@@ -254,15 +256,18 @@ function renderRestock() {
 
     if ([...select.options].some(o => o.value === current)) select.value = current;
   }
-  const rows = state.restocks.slice(0, 30);
+  const rows = state.restocks.slice(0, 80);
   $("#restock-list").innerHTML = rows.map(x => {
-    const canDelete = Boolean(x.itemKey && x.kategori && Number(x.qty) > 0 && !x.fromLedger);
+    const canDelete = Boolean(x.key);
+    const legacyLabel = x.ledgerOnly || (x.fromLedger && !x.itemKey)
+      ? `<small class="muted">Riwayat lama · stok tidak diubah</small>`
+      : "";
     return `<tr>
       <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
-      <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
-      <td>${x.qty} ${escapeHtml(x.satuan || "")}</td>
+      <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.supplier || "-")}</small>${legacyLabel}</td>
+      <td>${escapeHtml(x.qty ?? "-")} ${escapeHtml(x.satuan || "")}</td>
       <td>${money(x.total)}</td>
-      <td>${canDelete ? `<button class="table-action danger" data-delete-restock="${escapeHtml(x.key)}">Hapus</button>` : ""}</td>
+      <td>${canDelete ? `<button type="button" class="table-action danger" data-delete-restock="${escapeHtml(x.key)}">Hapus</button>` : ""}</td>
     </tr>`;
   }).join("") || `<tr><td colspan="5" class="empty">Belum ada riwayat restock.</td></tr>`;
 }
@@ -1099,39 +1104,71 @@ function bind() {
     const button = event.target.closest("[data-delete-restock]");
     if (!button) return;
 
-    const key = button.dataset.deleteRestock;
-    const row = state.restocks.find(x => String(x.key) === String(key));
+    const key = String(button.dataset.deleteRestock || "");
+    const row = state.restocks.find(x => String(x.key) === key);
     if (!row) return view.toast("Data restock tidak ditemukan.", "error");
 
+    const ledgerOnly = Boolean(row.ledgerOnly || (row.fromLedger && !row.itemKey));
     const qty = Number(row.qty || 0);
-    const stock = state.inventory.find(x => x.kategori === row.kategori && x.key === row.itemKey);
-    const currentStock = Number(stock?.stok || 0);
 
-    const confirmed = window.confirm(
-      `Hapus restock "${row.nama || row.itemKey}" sebanyak ${qty} ${row.satuan || "pcs"}?\\n\\n` +
-      `Stok akan dikurangi ${qty} dan transaksi pengeluaran restock ini juga dihapus.\\n` +
-      `Tindakan ini tidak bisa dibatalkan.`
-    );
-    if (!confirmed) return;
+    let message;
+    if (ledgerOnly) {
+      message =
+        `Hapus riwayat restock "${row.nama || "Restock"}"?\n\n` +
+        `Ini adalah riwayat lama yang tidak memiliki hubungan aman ke item inventori.\n` +
+        `Yang dihapus hanya catatan pengeluarannya; stok inventori tidak diubah.\n\n` +
+        `Tindakan ini tidak bisa dibatalkan.`;
+    } else {
+      message =
+        `Hapus restock "${row.nama || row.itemKey}" sebanyak ${qty} ${row.satuan || "pcs"}?\n\n` +
+        `Stok akan dikurangi ${qty} dan transaksi pengeluaran restock terkait ikut dihapus.\n\n` +
+        `Tindakan ini tidak bisa dibatalkan.`;
+    }
+
+    if (!window.confirm(message)) return;
 
     button.disabled = true;
     try {
-      if (stock && currentStock < qty) {
-        throw new Error(`Stok saat ini hanya ${currentStock} ${stock.satuan || row.satuan || "pcs"}, kurang dari qty restock ${qty}.`);
+      if (ledgerOnly) {
+        const ledgerKey = row._ledgerKey || row.key;
+        await deleteRestockLedgerOnly(ledgerKey);
+        state.ledger = state.ledger.filter(x => String(x.key) !== String(ledgerKey));
+        state.restocks = state.restocks.filter(x => String(x.key) !== key);
+        renderRestock();
+        renderAccounting();
+        view.toast("Riwayat restock lama berhasil dihapus.", "success");
+        return;
       }
 
       const result = await deleteRestock(key);
-      state.restocks = state.restocks.filter(x => String(x.key) !== String(key));
-      state.inventory = state.inventory.map(x =>
-        x.kategori === result.kategori && x.key === result.itemKey
-          ? { ...x, stok: result.stokBaru }
-          : x
+
+      state.restocks = state.restocks.filter(x => String(x.key) !== key);
+
+      if (result.itemKey && result.kategori && result.stockReverted) {
+        state.inventory = state.inventory.map(x =>
+          x.kategori === result.kategori && x.key === result.itemKey
+            ? { ...x, stok: result.stokBaru }
+            : x
+        );
+        renderInventory();
+      }
+
+      state.ledger = state.ledger.filter(x =>
+        !(String(x.sumber || x.kategori || "").toUpperCase() === "RESTOCK" &&
+          String(x.referensi || "") === key)
       );
 
-      renderInventory();
       renderRestock();
+      renderAccounting();
+      view.toast(
+        result.stockReverted
+          ? `Restock dihapus. Stok ${result.nama} sekarang ${result.stokBaru}.`
+          : "Restock dihapus. Tidak ada perubahan stok karena data item lama tidak lengkap.",
+        "success"
+      );
+
+      // Re-read once so the UI and Firebase are guaranteed to agree.
       await loadAll();
-      view.toast(`Restock dihapus. Stok ${result.nama} sekarang ${result.stokBaru}.`, "success");
     } catch (error) {
       console.error("OnePrint: gagal menghapus restock", error);
       view.toast(error?.message || "Gagal menghapus restock.", "error");
