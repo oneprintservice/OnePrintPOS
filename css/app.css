@@ -365,17 +365,3 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .maintenance-summary{grid-template-columns:1fr}
   .maintenance-actions>*{width:100%}
 }
-
-/* Tracking camera / restock actions */
-.track-form { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:stretch; }
-.track-scan-panel { margin-top:14px; padding:16px; border:1px solid var(--line,#e5e7eb); border-radius:16px; background:var(--panel,#fff); }
-.track-scan-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-.track-scan-head small { display:block; margin-top:3px; color:var(--muted,#6b7280); }
-#track-reader { width:100%; max-width:420px; margin:0 auto; overflow:hidden; border-radius:14px; }
-#track-reader video { width:100% !important; border-radius:14px; }
-.danger-action { color:#b91c1c; border-color:#fecaca; background:#fff; }
-@media (max-width:640px) {
-  .track-form { grid-template-columns:1fr 1fr; }
-  .track-form input { grid-column:1 / -1; }
-  .track-form .primary, .track-form .secondary { min-height:46px; }
-}

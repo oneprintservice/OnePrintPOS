@@ -49,15 +49,31 @@ export async function listServices() {
 
 export async function getService(key) {
   if (!key) return null;
-  const clean = String(key).replace(/^TT-|^INV-/i, "");
-  for (const root of SERVICE_ROOTS) {
-    const directPath = clean.startsWith(`${root}/`) ? clean : `${root}/${clean}`;
-    const snap = await db.ref(directPath).once("value");
-    if (snap.exists() && looksLikeService(snap.val())) return { key: directPath, ...snap.val() };
+
+  const raw = String(key).trim();
+  const clean = raw
+    .replace(/^https?:\/\/[^/]+\/servis\//i, "")
+    .replace(/^\/??servis\//i, "")
+    .replace(/^(TT|INV)[-:]/i, "");
+
+  // Public tracking and QR/manual lookup use the canonical Firebase path:
+  // /servis/{nomor}
+  const canonical = `servis/${clean}`;
+  const direct = await db.ref(canonical).once("value");
+  if (direct.exists() && looksLikeService(direct.val())) {
+    return { key: canonical, ...direct.val() };
   }
+
+  // Keep legacy compatibility for existing records stored elsewhere.
+  for (const root of SERVICE_ROOTS.filter(x => x !== "servis")) {
+    const snap = await db.ref(`${root}/${clean}`).once("value");
+    if (snap.exists() && looksLikeService(snap.val())) return { key: `${root}/${clean}`, ...snap.val() };
+  }
+
   const rows = await listServices();
   return rows.find(row =>
-    row.key === key || row.key === clean || row.nomor === clean || row.nomor === key
+    row.key === raw || row.key === clean || row.key === canonical ||
+    row.nomor === clean || row.nomor === raw
   ) || null;
 }
 

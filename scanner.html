@@ -295,40 +295,49 @@ window.print();
 
 }
 
-function startScanner(){
+async function startScanner(){
 
-if(scannerRunning) return;
+if(scannerRunning || !window.Html5Qrcode) return;
 
-
+const reader = document.getElementById('reader');
+reader.innerHTML = '';
 html5QrCode = new Html5Qrcode('reader');
 
-scannerRunning = true;
+try {
+  scannerRunning = true;
+  document.getElementById('scanToggleBtn').innerText = 'Stop Scan';
+  document.getElementById('scanToggleBtn').classList.remove('bg-blue-600');
+  document.getElementById('scanToggleBtn').classList.add('bg-red-500');
 
-document.getElementById('scanToggleBtn').innerText = 'Stop Scan';
-document.getElementById('scanToggleBtn').classList.remove('bg-blue-600');
-document.getElementById('scanToggleBtn').classList.add('bg-red-500');
+  const cameras = await Html5Qrcode.getCameras();
+  if (!cameras.length) throw new Error('Kamera tidak ditemukan');
 
-html5QrCode.start(
-{ facingMode:'environment' },
-{
-fps:10,
-qrbox:{width:250,height:250}
-},
-(decodedText)=>{
+  const camera = cameras.find(x => /back|rear|environment|belakang/i.test(x.label)) || cameras[0];
 
-document.getElementById('scanResult').innerText = decodedText;
-document.getElementById('manualCode').value = decodedText;
+  await html5QrCode.start(
+    camera.id,
+    {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1
+    },
+    async decodedText => {
+      const value = decodedText.trim();
+      document.getElementById('scanResult').innerText = value;
+      document.getElementById('manualCode').value = value;
 
-if(navigator.vibrate){
-navigator.vibrate(120);
+      if(navigator.vibrate) navigator.vibrate(120);
+      await stopScanner();
+    },
+    () => {}
+  );
+} catch(error) {
+  console.error(error);
+  await stopScanner();
+  alert('Kamera tidak dapat dibuka. Pastikan izin kamera diberikan.');
 }
 
-},
-()=>{}
-);
-
 }
-
 
 let html5QrCode = null;
 let scannerRunning = false;
@@ -341,26 +350,22 @@ startScanner();
 }
 }
 
-function stopScanner(){
+async function stopScanner(){
 
 if(html5QrCode){
 
-html5QrCode.stop().then(()=>{
+try { await html5QrCode.stop(); } catch(error) {}
+try { await html5QrCode.clear(); } catch(error) {}
+
+html5QrCode = null;
+}
 
 scannerRunning = false;
 
-document.getElementById('scanToggleBtn').innerText =
-'Start Scan';
-
-document.getElementById('scanToggleBtn')
-.classList.remove('bg-red-500');
-
-document.getElementById('scanToggleBtn')
-.classList.add('bg-blue-600');
-
-});
-
-}
+document.getElementById('scanToggleBtn').innerText = 'Start Scan';
+document.getElementById('scanToggleBtn').classList.remove('bg-red-500');
+document.getElementById('scanToggleBtn').classList.add('bg-blue-600');
+document.getElementById('reader').innerHTML = '';
 
 }
 
