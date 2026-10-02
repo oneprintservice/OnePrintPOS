@@ -56,9 +56,64 @@ async function run() {
   }
 }
 
+let qrScanner = null;
+let scanning = false;
+
+async function stopScanner() {
+  if (qrScanner) {
+    try { await qrScanner.stop(); } catch {}
+    try { await qrScanner.clear(); } catch {}
+    qrScanner = null;
+  }
+  scanning = false;
+  $("#scanner-wrap").hidden = true;
+  $("#scan").textContent = "▣ Scan QR";
+}
+
+async function startScanner() {
+  if (scanning) return stopScanner();
+  if (!window.Html5Qrcode) {
+    $("#scan-status").textContent = "Scanner tidak tersedia. Periksa koneksi internet.";
+    return;
+  }
+
+  $("#scanner-wrap").hidden = false;
+  $("#scan").textContent = "Tutup Scanner";
+  $("#scan-status").textContent = "Meminta akses kamera...";
+  qrScanner = new Html5Qrcode("tracking-reader");
+
+  try {
+    let camera = { facingMode: "environment" };
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (cameras.length) {
+        camera = (cameras.find(x => /back|rear|environment|belakang/i.test(x.label)) || cameras[0]).id;
+      }
+    } catch {}
+
+    scanning = true;
+    await qrScanner.start(camera, {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1
+    }, async decodedText => {
+      const nomor = normalizeCode(decodedText);
+      $("#search").value = nomor;
+      await stopScanner();
+      await run();
+    }, () => {});
+  } catch (error) {
+    console.error(error);
+    await stopScanner();
+    $("#scan-status").textContent = "Kamera tidak dapat dibuka. Izinkan kamera dan gunakan HTTPS.";
+  }
+}
+
 $("#search").value = initialCode;
 $("#form").addEventListener("submit", event => {
   event.preventDefault();
   run();
 });
+$("#scan").addEventListener("click", startScanner);
+window.addEventListener("pagehide", stopScanner);
 if (initialCode) run();

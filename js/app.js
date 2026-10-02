@@ -5,10 +5,10 @@ import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
-} from "./features/services.js?v=20261002-fix2";
+} from "./features/services.js?v=20261002-fix3";
 import { printReceipt } from "./features/receipt.js?v=20260923-printfix";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix2";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix3";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -118,23 +118,8 @@ async function loadAll() {
   if (tasks[2].status === "fulfilled") state.restocks = tasks[2].value;
   if (tasks[3].status === "fulfilled") state.ledger = tasks[3].value;
 
-  // Older restock entries may exist only in the expense ledger. Display them
-  // without writing anything back or double-counting accounting entries.
-  const knownRestockIds = new Set(state.restocks.map(x => String(x.key)));
-  const ledgerRestocks = state.ledger
-    .filter(x => String(x.sumber || x.kategori || "").toUpperCase() === "RESTOCK")
-    .filter(x => !knownRestockIds.has(String(x.referensi || x.key)))
-    .map(x => ({
-      key: x.referensi || x.key,
-      tanggal: x.tanggal,
-      nama: String(x.keterangan || "Restock").replace(/^Restock\\s*/i, "") || "Restock",
-      supplier: x.supplier || "",
-      qty: x.qty ?? "-",
-      satuan: x.qty == null ? "" : (x.satuan || "pcs"),
-      total: Number(x.jumlah || x.total || 0),
-      fromLedger: true
-    }));
-  state.restocks = [...state.restocks, ...ledgerRestocks]
+  // Restock history is sourced from canonical /restock records only.
+  state.restocks = state.restocks
     .sort((a, b) => (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0));
 
   if (tasks.some(x => x.status === "rejected")) {
@@ -255,12 +240,12 @@ function renderRestock() {
     if ([...select.options].some(o => o.value === current)) select.value = current;
   }
   const rows = state.restocks.slice(0, 30);
-  $("#restock-list").innerHTML = rows.map(x => `<tr>
+  $("#restock-list").innerHTML = rows.map(x => `<tr data-restock-row="${escapeHtml(x.key)}">
     <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
-    <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
-    <td>${x.qty} ${escapeHtml(x.satuan || "")}</td>
+    <td><strong>${escapeHtml(x.nama || x.itemKey || "-")}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
+    <td><strong>${Number(x.qty || 0).toLocaleString("id-ID")}</strong> ${escapeHtml(x.satuan || "")}</td>
     <td>${money(x.total)}</td>
-    <td>${x.fromLedger ? "" : `<button class="table-action danger" data-del-restock="${escapeHtml(x.key)}">Hapus</button>`}</td>
+    <td class="restock-action-cell"><button type="button" class="table-action danger" data-del-restock="${escapeHtml(x.key)}">Hapus</button></td>
   </tr>`).join("") || `<tr><td colspan="5" class="empty">Belum ada riwayat restock.</td></tr>`;
 }
 
@@ -710,11 +695,12 @@ async function startCodeScanner(mode = "printer") {
           return;
         }
 
-        const service = await findServiceByCode(code);
-        if (!service) return view.toast(`Kode ${code} tidak ditemukan`, "error");
-        fillService(service);
-        switchPage("kasir");
-        view.toast(`Servis ${service.nomor} dibuka dari scanner`, "success");
+        const normalized = String(code || "").trim()
+          .replace(/^https?:\/\/[^/]+\/servis\//i, "")
+          .replace(/^\/?servis\//i, "")
+          .replace(/^(TT|INV)[-:]/i, "");
+        if (!normalized) return view.toast("QR tidak berisi nomor servis", "error");
+        window.location.href = `tracking.html?nomor=${encodeURIComponent(normalized)}`;
       }
     );
   } catch (err) {

@@ -365,3 +365,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .maintenance-summary{grid-template-columns:1fr}
   .maintenance-actions>*{width:100%}
 }
+
+/* Restock history: every canonical restock row owns its own action cell. */
+.restock-action-cell { width: 92px; min-width: 92px; text-align: right; white-space: nowrap; }
+.restock-action-cell .table-action { display: inline-flex; align-items: center; justify-content: center; }

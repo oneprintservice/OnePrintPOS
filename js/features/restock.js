@@ -32,7 +32,7 @@ export async function createRestock({ item, kategori, qty, hargaBeli, supplier, 
     updates[`keuangan/${id}`] = {
       tanggal: date, tipe: "PENGELUARAN", kategori: "RESTOCK",
       sumber: "RESTOCK", referensi: id, keterangan: `Restock ${item.nama || item.key}`,
-      jumlah: total, supplier: supplier || ""
+      jumlah: total, supplier: supplier || "", itemKey: item.key, nama: item.nama || "", kategori_item: kategori, qty: amount, satuan: item.satuan || "pcs", harga_beli: unitCost
     };
   }
   await db.ref().update(updates);
