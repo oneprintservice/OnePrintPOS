@@ -4,7 +4,14 @@ export async function listRestocks(limit = 50) {
   const snap = await db.ref("restock").once("value");
   if (!snap.exists()) return [];
   const rows = [];
-  snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
+  snap.forEach(child => {
+    const value = child.val();
+    // Ignore malformed/null legacy children instead of failing the entire
+    // history read. One bad node must never make the UI show only a locally
+    // created record.
+    if (!value || typeof value !== "object" || Array.isArray(value)) return;
+    rows.push({ key: child.key, ...value });
+  });
   const sorted = rows.sort((a, b) => {
     const byDate = (Date.parse(b.tanggal || 0) || 0) - (Date.parse(a.tanggal || 0) || 0);
     return byDate || String(b.key || "").localeCompare(String(a.key || ""));

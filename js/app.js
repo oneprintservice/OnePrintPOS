@@ -5,10 +5,10 @@ import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
-} from "./features/services.js?v=20261002-fix6";
-import { printReceipt } from "./features/receipt.js?v=20261002-fix6";
+} from "./features/services.js?v=20261003-fix8";
+import { printReceipt } from "./features/receipt.js?v=20261003-fix8";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix6";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261003-fix8";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
