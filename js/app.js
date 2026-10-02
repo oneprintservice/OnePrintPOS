@@ -5,10 +5,10 @@ import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
-} from "./features/services.js?v=20261002-fix5";
-import { printReceipt } from "./features/receipt.js?v=20261002-fix5";
+} from "./features/services.js?v=20261002-fix6";
+import { printReceipt } from "./features/receipt.js?v=20261002-fix6";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix5";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix6";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -83,7 +83,10 @@ function currentForm() {
 }
 
 function total() {
-  return [...state.items.jasa, ...state.items.sparepart].reduce((sum, item) => sum + Number(item.harga || 0), 0);
+  return [...state.items.jasa, ...state.items.sparepart].reduce(
+    (sum, item) => sum + (Number(item.harga || 0) * Math.max(1, Number(item.qty) || 1)),
+    0
+  );
 }
 
 function escapeHtml(v) {
@@ -103,7 +106,9 @@ function renderCart() {
     state.items[cat].forEach((item, i) => {
       const row = document.createElement("div");
       row.className = "cart-row";
-      row.innerHTML = `<div><strong>${escapeHtml(item.nama)}</strong>${item.dariInventori ? "<small> • inventory</small>" : ""}</div><div>${money(item.harga)} <button class="icon-btn danger" data-remove="${cat}:${i}" title="Hapus">×</button></div>`;
+      const qty = Math.max(1, Number(item.qty) || 1);
+      const subtotal = Number(item.harga || 0) * qty;
+      row.innerHTML = `<div><strong>${escapeHtml(item.nama)}</strong>${item.dariInventori ? "<small> • inventory</small>" : ""}</div><div><span class="cart-qty">${qty} ×</span> ${money(subtotal)} <button class="icon-btn danger" data-remove="${cat}:${i}" title="Hapus">×</button></div>`;
       el.append(row);
     });
   }
@@ -421,7 +426,10 @@ function fillService(data) {
   $("#input-keluhan").value = data.keluhan || "";
   $("#status-servis").value = data.status || "MASUK";
   $("#keterangan-servis").value = data.keterangan || "";
-  state.items = { jasa: data.jasa || [], sparepart: data.sparepart || [] };
+  state.items = {
+    jasa: (data.jasa || []).map(item => ({ ...item, qty: Math.max(1, Number(item.qty) || 1) })),
+    sparepart: (data.sparepart || []).map(item => ({ ...item, qty: Math.max(1, Number(item.qty) || 1) }))
+  };
   state.editServiceKey = data.key;
   state.editServiceOriginal = { ...data };
   $("#service-mode").textContent = `Edit ${data.nomor || data.key}`;
@@ -431,9 +439,10 @@ function fillService(data) {
 
 async function addCartItem() {
   const name = $("#input-item-nama").value.trim();
+  const qty = Math.max(1, Number($("#input-item-qty").value) || 0);
   const price = Number($("#input-item-harga").value) || 0;
-  if (!name || price <= 0) return view.toast("Nama dan harga wajib diisi", "error");
-  const item = { nama: name, harga: price };
+  if (!name || qty <= 0 || price <= 0) return view.toast("Nama, qty, dan harga wajib diisi", "error");
+  const item = { nama: name, harga: price, qty };
   if (state.selectedInventory) {
     const inv = state.inventory.find(x => x.key === state.selectedInventory.key && x.kategori === state.selectedInventory.kategori);
     if (inv) {
@@ -443,15 +452,25 @@ async function addCartItem() {
   }
   state.items[state.tab].push(item);
   state.selectedInventory = null;
-  $("#input-item-nama").value = ""; $("#input-item-harga").value = ""; $("#suggestions").hidden = true;
+  $("#input-item-nama").value = ""; $("#input-item-qty").value = "1"; $("#input-item-harga").value = ""; $("#suggestions").hidden = true;
   renderCart();
 }
 
 async function syncInventoryUsage(previousItems, nextItems) {
   const oldCounts = new Map();
   const newCounts = new Map();
-  [...(previousItems || [])].forEach(i => { if (i.dariInventori && i.kategori !== "jasa") oldCounts.set(`${i.kategori}/${i.key}`, (oldCounts.get(`${i.kategori}/${i.key}`) || 0) + 1); });
-  [...(nextItems || [])].forEach(i => { if (i.dariInventori && i.kategori !== "jasa") newCounts.set(`${i.kategori}/${i.key}`, (newCounts.get(`${i.kategori}/${i.key}`) || 0) + 1); });
+  [...(previousItems || [])].forEach(i => {
+    if (i.dariInventori && i.kategori !== "jasa") {
+      const qty = Math.max(1, Number(i.qty) || 1);
+      oldCounts.set(`${i.kategori}/${i.key}`, (oldCounts.get(`${i.kategori}/${i.key}`) || 0) + qty);
+    }
+  });
+  [...(nextItems || [])].forEach(i => {
+    if (i.dariInventori && i.kategori !== "jasa") {
+      const qty = Math.max(1, Number(i.qty) || 1);
+      newCounts.set(`${i.kategori}/${i.key}`, (newCounts.get(`${i.kategori}/${i.key}`) || 0) + qty);
+    }
+  });
   const keys = new Set([...oldCounts.keys(), ...newCounts.keys()]);
   for (const key of keys) {
     const [kategori, invKey] = key.split("/");

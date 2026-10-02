@@ -1,4 +1,4 @@
-import { db, safeKey } from "../core/firebase.js";
+import { db } from "../core/firebase.js";
 
 export async function listRestocks(limit = Infinity) {
   const snap = await db.ref("restock").once("value");
@@ -17,7 +17,10 @@ export async function createRestock({ item, kategori, qty, hargaBeli, supplier, 
   const stockSnap = await db.ref(`inventori/${kategori}/${item.key}/stok`).once("value");
   const current = Number(stockSnap.val() || 0);
   const next = current + amount;
-  const id = `${Date.now()}_${safeKey(item.key)}`;
+  // Gunakan key unik Firebase, bukan Date.now(), agar dua input restock
+  // yang dibuat sangat berdekatan tidak saling menimpa.
+  const id = db.ref("restock").push().key;
+  if (!id) throw new Error("Gagal membuat ID restock");
   const date = tanggal ? new Date(`${tanggal}T12:00:00`).toISOString() : new Date().toISOString();
   const total = amount * unitCost;
 
