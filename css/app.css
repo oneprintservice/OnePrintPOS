@@ -78,9 +78,9 @@
   left:0;
   top:0;
   bottom:0;
-  width:225px;
+  width:205px;
   margin:0;
-  padding:16px 10px;
+  padding:14px 9px;
   flex-direction:column;
   background:#0f172a;
   color:#fff;
@@ -100,15 +100,15 @@
   display:flex!important;
   align-items:center;
   justify-content:flex-start!important;
-  gap:8px;
+  gap:7px;
   width:100%;
-  min-height:40px;
-  padding:8px 8px;
-  border-radius:11px;
+  min-height:38px;
+  padding:7px 8px;
+  border-radius:10px;
   background:transparent;
   color:#94a3b8;
   text-align:left;
-  font-size:11px;
+  font-size:12px;
 }
 .sidebar nav button:hover,.sidebar nav button.active{background:#1e293b;color:#fff}
 .sidebar nav button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
@@ -400,3 +400,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
   #toast{display:none!important}
 }
 \n/* v4.2 — compact mobile drawer and transaction quantity */\n.cart-qty{font-weight:800;color:#475467;margin-right:2px}\n@media(max-width:680px){\n  .sidebar{width:225px;padding:16px 10px}\n  .sidebar .side-brand{padding-left:6px;padding-right:6px}\n  .sidebar nav button{min-height:40px;padding:8px 8px;font-size:11px;gap:8px}\n  .sidebar nav button svg{width:17px;height:17px}\n}\n
+/* fix7: reserve the action column so history rows never shift */
+.restock-action-cell{white-space:nowrap;text-align:right}
+.table-action-placeholder{display:inline-block;min-width:58px;text-align:center;visibility:hidden}

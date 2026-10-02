@@ -124,8 +124,14 @@ async function loadAll() {
   if (tasks[3].status === "fulfilled") state.ledger = tasks[3].value;
 
   // Restock history is sourced from canonical /restock records only.
+  // Firebase push keys are chronological, so use them as the tie-breaker when
+  // several records share the same selected calendar date.
   state.restocks = state.restocks
-    .sort((a, b) => (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0));
+    .sort((a, b) => {
+      const byDate = (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0);
+      return byDate || String(b.key || "").localeCompare(String(a.key || ""));
+    })
+    .slice(0, 50);
 
   if (tasks.some(x => x.status === "rejected")) {
     console.error("OnePrint: sebagian data gagal dimuat", tasks.filter(x => x.status === "rejected").map(x => x.reason));
@@ -244,28 +250,31 @@ function renderRestock() {
 
     if ([...select.options].some(o => o.value === current)) select.value = current;
   }
-  // Riwayat restock = bulan berjalan (tanggal kalender), bukan rolling 30 hari.
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth();
-  const rows = state.restocks.filter(x => {
-    const d = new Date(x.tanggal || 0);
-    return !Number.isNaN(d.getTime()) &&
-      d.getFullYear() === currentYear &&
-      d.getMonth() === currentMonth;
-  });
+  // Riwayat restock: 50 transaksi terbaru, tanpa filter bulan.
+  // Hanya transaksi paling baru yang boleh dihapus. Setelah dihapus,
+  // tombol otomatis berpindah ke transaksi terbaru berikutnya.
+  const rows = state.restocks
+    .slice()
+    .sort((a, b) => {
+      const byDate = (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0);
+      return byDate || String(b.key || "").localeCompare(String(a.key || ""));
+    })
+    .slice(0, 50);
+
+  state.restocks = rows;
   const historyTitle = document.querySelector("#page-restock .panel:nth-child(2) .panel-head h2");
-  if (historyTitle) {
-    const monthLabel = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" })
-      .format(new Date(currentYear, currentMonth, 1));
-    historyTitle.textContent = `Restock ${monthLabel} (${rows.length})`;
-  }
-  $("#restock-list").innerHTML = rows.map(x => `<tr data-restock-row="${escapeHtml(x.key)}">
+  if (historyTitle) historyTitle.textContent = `Restock Terbaru (${rows.length})`;
+
+  $("#restock-list").innerHTML = rows.map((x, index) => `<tr data-restock-row="${escapeHtml(x.key)}">
     <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
     <td><strong>${escapeHtml(x.nama || x.itemKey || "-")}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
     <td><strong>${Number(x.qty || 0).toLocaleString("id-ID")}</strong> ${escapeHtml(x.satuan || "")}</td>
     <td>${money(x.total)}</td>
-    <td class="restock-action-cell"><button type="button" class="table-action danger" data-del-restock="${escapeHtml(x.key)}">Hapus</button></td>
+    <td class="restock-action-cell">${
+      index === 0
+        ? `<button type="button" class="table-action danger" data-del-restock="${escapeHtml(x.key)}">Hapus</button>`
+        : `<span class="table-action-placeholder" aria-hidden="true">—</span>`
+    }</td>
   </tr>`).join("") || `<tr><td colspan="5" class="empty">Belum ada riwayat restock.</td></tr>`;
 }
 
@@ -854,8 +863,15 @@ function bind() {
 
     const delRestock = e.target.closest("[data-del-restock]");
     if (delRestock) {
-      const restock = state.restocks.find(x => x.key === delRestock.dataset.delRestock);
-      if (!restock) return;
+      const restocks = state.restocks.slice().sort((a, b) => {
+        const byDate = (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0);
+        return byDate || String(b.key || "").localeCompare(String(a.key || ""));
+      });
+      const restock = restocks[0];
+      if (!restock || restock.key !== delRestock.dataset.delRestock) {
+        view.toast("Hapus restock harus dimulai dari transaksi paling baru.", "error");
+        return;
+      }
       if (!confirm(`Hapus restock ${restock.nama || restock.itemKey}? Stok akan dikurangi ${restock.qty}.`)) return;
 
       try {
@@ -1164,7 +1180,11 @@ function bind() {
     // The multi-path Firebase write has succeeded. Show its result immediately,
     // even if the subsequent history read is delayed or temporarily unavailable.
     state.restocks = [result, ...state.restocks.filter(x => x.key !== result.key)]
-      .sort((a, b) => (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0));
+      .sort((a, b) => {
+        const byDate = (Date.parse(b.tanggal) || 0) - (Date.parse(a.tanggal) || 0);
+        return byDate || String(b.key || "").localeCompare(String(a.key || ""));
+      })
+      .slice(0, 50);
     renderRestock();
     await loadAll();
     view.toast(`Restock ${result.nama} berhasil. Stok sekarang ${result.stokBaru}.`, "success");

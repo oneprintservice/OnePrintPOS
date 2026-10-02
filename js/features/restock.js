@@ -1,11 +1,14 @@
 import { db } from "../core/firebase.js";
 
-export async function listRestocks(limit = Infinity) {
+export async function listRestocks(limit = 50) {
   const snap = await db.ref("restock").once("value");
   if (!snap.exists()) return [];
   const rows = [];
   snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
-  const sorted = rows.sort((a,b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0));
+  const sorted = rows.sort((a, b) => {
+    const byDate = (Date.parse(b.tanggal || 0) || 0) - (Date.parse(a.tanggal || 0) || 0);
+    return byDate || String(b.key || "").localeCompare(String(a.key || ""));
+  });
   return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
 }
 
