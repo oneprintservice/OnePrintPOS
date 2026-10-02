@@ -1,11 +1,12 @@
 import { db, safeKey } from "../core/firebase.js";
 
-export async function listRestocks(limit = 80) {
+export async function listRestocks(limit = Infinity) {
   const snap = await db.ref("restock").once("value");
   if (!snap.exists()) return [];
   const rows = [];
   snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
-  return rows.sort((a,b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0)).slice(0, limit);
+  const sorted = rows.sort((a,b) => new Date(b.tanggal || 0) - new Date(a.tanggal || 0));
+  return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
 }
 
 export async function createRestock({ item, kategori, qty, hargaBeli, supplier, tanggal, catatan }) {

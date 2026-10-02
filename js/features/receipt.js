@@ -8,7 +8,8 @@ const PRINT_CSS = `
 @page { size: A5 portrait; margin: 5mm; }
 #print-container { display:none; }
 @media print {
-  #app-ui, .no-print { display:none !important; }
+  body > *:not(#print-container) { display:none !important; }
+  #toast, #modal, .no-print { display:none !important; }
   body { background-color:white !important; margin:0 !important; padding:0 !important; }
   #print-container {
     display:block !important;
@@ -221,16 +222,33 @@ export function buildReceipt(data, tipe = "nota") {
   let noteContent = "";
 
   if (tipe === "nota") {
+    const groupItems = items => {
+      const groups = new Map();
+      items.forEach(item => {
+        const nama = String(item?.nama || "-").trim();
+        const harga = Number(item?.harga || 0);
+        const qty = Math.max(1, Number(item?.qty) || 1);
+        const key = `${nama.toLowerCase()}\\u0000${harga}`;
+        const existing = groups.get(key);
+        if (existing) existing.qty += qty;
+        else groups.set(key, { nama, harga, qty });
+      });
+      return [...groups.values()];
+    };
+
     let rows = "";
     [["jasa","A. JASA SERVIS"],["sparepart","B. SPAREPART / TINTA"]].forEach(([cat,title]) => {
-      const items = cat === "jasa" ? jasa : sparepart;
-      rows += `<tr class="category-header"><td style="text-align:center">-</td><td colspan="2">${title}</td></tr>`;
-      if (!items.length) rows += `<tr><td style="text-align:center">-</td><td>-</td><td style="text-align:right">-</td></tr>`;
+      const items = groupItems(cat === "jasa" ? jasa : sparepart);
+      rows += `<tr class="category-header"><td style="text-align:center">-</td><td colspan="3">${title}</td></tr>`;
+      if (!items.length) {
+        rows += `<tr><td style="text-align:center">-</td><td>-</td><td style="text-align:center">-</td><td style="text-align:right">-</td></tr>`;
+      }
       items.forEach((item,i) => {
-        rows += `<tr><td style="text-align:center">${i+1}</td><td class="uppercase">${esc(item.nama)}</td><td style="text-align:right">Rp ${moneyRaw(item.harga)}</td></tr>`;
+        const subtotal = item.qty * item.harga;
+        rows += `<tr><td style="text-align:center">${i+1}</td><td class="uppercase">${esc(item.nama)}</td><td style="text-align:center">${item.qty}</td><td style="text-align:right">Rp ${moneyRaw(subtotal)}</td></tr>`;
       });
     });
-    mainContent = `<table class="service-table"><thead><tr><th width="5%">No</th><th width="70%">Rincian</th><th width="25%">Subtotal</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="font-bold"><td colspan="2" style="text-align:right">TOTAL :</td><td style="text-align:right;background:#eee;">Rp ${moneyRaw(total)}</td></tr></tfoot></table>`;
+    mainContent = `<table class="service-table"><thead><tr><th width="5%">No</th><th width="60%">Rincian</th><th width="10%">Qty</th><th width="25%">Subtotal</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="font-bold"><td colspan="3" style="text-align:right">TOTAL :</td><td style="text-align:right;background:#eee;">Rp ${moneyRaw(total)}</td></tr></tfoot></table>`;
     noteContent = `<div class="note-box"><span class="note-title">PERHATIAN:</span><ol><li>1. Simpan nota / invoice sebagai bukti garansi.</li><li>2. Garansi tidak berlaku jika segel rusak atau cacat fisik karena pemakaian.</li></ol></div>`;
   } else {
     mainContent = `<div class="print-complaint"><div style="font-weight:bold;border-bottom:1px solid #ccc;margin-bottom:8px;">KELUHAN PERANGKAT:</div><div class="uppercase">${esc(keluhan).replaceAll("\\n","<br>")}</div>
@@ -253,6 +271,11 @@ atau scan QR di samping.
 
 export function printReceipt(data, tipe = "nota") {
   ensurePrintStyle();
+  const toast = document.getElementById("toast");
+  if (toast) {
+    toast.classList.remove("show");
+    toast.setAttribute("aria-hidden", "true");
+  }
   const container = ensurePrintContainer();
   container.innerHTML = buildReceipt(data, tipe);
 

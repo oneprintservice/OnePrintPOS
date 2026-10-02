@@ -5,10 +5,10 @@ import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
-} from "./features/services.js?v=20261002-fix3";
-import { printReceipt } from "./features/receipt.js?v=20260923-printfix";
+} from "./features/services.js?v=20261002-fix5";
+import { printReceipt } from "./features/receipt.js?v=20261002-fix5";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix3";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix5";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -239,7 +239,22 @@ function renderRestock() {
 
     if ([...select.options].some(o => o.value === current)) select.value = current;
   }
-  const rows = state.restocks.slice(0, 30);
+  // Riwayat restock = bulan berjalan (tanggal kalender), bukan rolling 30 hari.
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  const rows = state.restocks.filter(x => {
+    const d = new Date(x.tanggal || 0);
+    return !Number.isNaN(d.getTime()) &&
+      d.getFullYear() === currentYear &&
+      d.getMonth() === currentMonth;
+  });
+  const historyTitle = document.querySelector("#page-restock .panel:nth-child(2) .panel-head h2");
+  if (historyTitle) {
+    const monthLabel = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" })
+      .format(new Date(currentYear, currentMonth, 1));
+    historyTitle.textContent = `Restock ${monthLabel} (${rows.length})`;
+  }
   $("#restock-list").innerHTML = rows.map(x => `<tr data-restock-row="${escapeHtml(x.key)}">
     <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
     <td><strong>${escapeHtml(x.nama || x.itemKey || "-")}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
