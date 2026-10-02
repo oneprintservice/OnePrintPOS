@@ -1,4 +1,4 @@
-import { getService } from "./features/services.js";
+import { getService } from "./features/services.js?v=20261002-fix2";
 
 const $ = s => document.querySelector(s);
 const params = new URLSearchParams(location.search);

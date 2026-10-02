@@ -5,10 +5,10 @@ import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
-} from "./features/services.js";
+} from "./features/services.js?v=20261002-fix2";
 import { printReceipt } from "./features/receipt.js?v=20260923-printfix";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261002-fix2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -668,12 +668,19 @@ async function startCodeScanner(mode = "printer") {
 
   try {
     scanner = new Html5Qrcode("app-reader");
-    const cameras = await Html5Qrcode.getCameras();
-    if (!cameras.length) throw new Error("Kamera tidak ditemukan");
-    const camera = cameras.find(x => /back|rear|environment|belakang/i.test(x.label)) || cameras[0];
+    let cameraConfig = { facingMode: "environment" };
+    try {
+      const cameras = await Html5Qrcode.getCameras();
+      if (cameras.length) {
+        const camera = cameras.find(x => /back|rear|environment|belakang/i.test(x.label)) || cameras[0];
+        cameraConfig = camera.id;
+      }
+    } catch (cameraError) {
+      console.warn("Daftar kamera tidak tersedia, fallback ke environment:", cameraError);
+    }
 
     await scanner.start(
-      camera.id,
+      cameraConfig,
       {
         fps: 20,
         qrbox: { width: Math.min(300, Math.max(220, window.innerWidth - 90)), height: 120 },
