@@ -140,7 +140,24 @@ async function startScanner() {
         aspectRatio: 1
       },
       async decodedText => {
-        const nomor = normalizeCode(decodedText);
+        const raw = String(decodedText || "").trim();
+        if (!raw) return;
+
+        // QR pada struk berisi URL tracking. Jika QR berisi URL http/https,
+        // langsung buka alamat tersebut; jangan masukkan URL ke kolom nomor.
+        try {
+          const url = new URL(raw);
+          if (url.protocol === "http:" || url.protocol === "https:") {
+            status.textContent = "QR terbaca. Membuka halaman tracking...";
+            await stopScanner();
+            window.location.assign(url.href);
+            return;
+          }
+        } catch (_) {
+          // Bukan URL; lanjutkan sebagai nomor servis biasa.
+        }
+
+        const nomor = normalizeCode(raw);
         if (!nomor) return;
         $("#search").value = nomor;
         status.textContent = `QR terbaca: ${nomor}`;
