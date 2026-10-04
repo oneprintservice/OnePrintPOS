@@ -69,3 +69,7 @@ Menu Tools sekarang menggantikan shortcut website publik dengan Pemeliharaan Dat
 
 
 Print reliability fix: receipt container is no longer cleared in afterprint because Android Chrome can fire afterprint while the preview is opening. Print now waits for fonts/images and two animation frames before window.print(). Receipt logo path is corrected to assets/logos.png and receipt module URL is cache-busted.
+
+
+## Checkpoint — Premium Blue UI
+Visual redesign applied to the existing fix9 functionality. Firebase paths, service/restock logic, invoice quantity grouping, and QR tracking flow are unchanged.
