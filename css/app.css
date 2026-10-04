@@ -838,19 +838,6 @@ th,td{
     background:#0b73ff;
     box-shadow:0 5px 15px rgba(11,115,255,.35);
   }
-  .mobile-bottom-nav button.nav-fab{
-    color:#9fb5d5;
-    margin-top:0;
-    background:transparent;
-  }
-  .mobile-bottom-nav button.nav-fab .mobile-nav-icon{
-    width:25px;
-    height:25px;
-    border-radius:9px;
-    background:transparent;
-    box-shadow:none;
-    font-size:18px;
-  }
   .mobile-bottom-nav button small{
     font-size:8px;
     line-height:1;
@@ -865,35 +852,6 @@ th,td{
   .mobile-bottom-nav button[data-page="restock"],
   .mobile-bottom-nav button[data-page="accounting"]{
     display:none;
-  }
-}
-
-
-/* Premium Blue mobile polish 1:
-   keep the original compact 225px drawer and make the center FAB
-   active state icon-only instead of a large tile highlight. */
-@media(max-width:680px){
-  .sidebar{
-    width:225px!important;
-  }
-
-  .mobile-bottom-nav button.nav-fab,
-  .mobile-bottom-nav button.nav-fab.active{
-    background:transparent!important;
-    box-shadow:none!important;
-    color:#9fb5d5;
-  }
-
-  .mobile-bottom-nav button.nav-fab.active .mobile-nav-icon{
-    background:rgba(30,136,255,.18);
-    color:#fff;
-    box-shadow:none;
-    transform:none;
-  }
-
-  .mobile-bottom-nav button.active:not(.nav-fab){
-    background:rgba(30,136,255,.16);
-    box-shadow:none;
   }
 }
 

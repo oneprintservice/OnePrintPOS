@@ -818,26 +818,62 @@ function isLiquidInventoryUnit(unit) {
 }
 
 function updateInventoryUnitUI() {
+  const category = String($("#inv-kategori")?.value || "").toLowerCase();
   const unit = $("#inv-satuan")?.value || "pcs";
-  const liquid = isLiquidInventoryUnit(unit);
+  const liquidCategory = category === "tinta" || category === "cairan";
+  const liquid = liquidCategory || isLiquidInventoryUnit(unit);
   const packSize = $("#inv-pack-size");
   const sellSize = $("#inv-sell-size");
   const sellUnit = $("#inv-sell-unit");
   const note = $("#inventory-unit-note");
+  const packLabel = $("#inv-pack-size-label");
+  const sellSizeLabel = $("#inv-sell-size-label");
+  const sellUnitLabel = $("#inv-sell-unit-label");
+  const beliLabel = document.querySelector('label[for="inv-beli"]');
   if (!packSize || !sellSize || !sellUnit) return;
 
-  if (liquid) {
-    if (!Number(packSize.value)) packSize.value = 1000;
-    if (!Number(sellSize.value)) sellSize.value = 100;
+  // Tinta dan cairan selalu dikelola sebagai volume dasar.
+  if (liquidCategory && !isLiquidInventoryUnit(unit)) {
+    $("#inv-satuan").value = "ml";
+  }
+
+  const baseUnit = $("#inv-satuan").value || unit;
+  const isLiquid = liquidCategory || isLiquidInventoryUnit(baseUnit);
+
+  if (isLiquid) {
+    if (!Number(packSize.value) || Number(packSize.value) === 1) packSize.value = 1000;
+    if (!Number(sellSize.value) || Number(sellSize.value) === 1) sellSize.value = 100;
+
     if (!sellUnit.value || /^(pcs|ml|gram|unit)$/i.test(sellUnit.value)) {
-      sellUnit.value = `${sellSize.value}${unit}`;
+      sellUnit.value = `${sellSize.value}${baseUnit}`;
     }
-    note.textContent = `Stok disimpan dalam ${unit}. Satu transaksi menjual ${sellSize.value} ${unit} per qty, sehingga pemakaian pelanggan < ${sellSize.value} tetap dibebankan 1 unit jual.`;
+
+    if (packLabel) packLabel.childNodes[0].nodeValue = "Isi 1 kemasan beli (ml)";
+    if (sellSizeLabel) sellSizeLabel.childNodes[0].nodeValue = "Isi per penjualan (ml)";
+    if (sellUnitLabel) sellUnitLabel.childNodes[0].nodeValue = "Nama unit jual";
+    if (beliLabel) beliLabel.childNodes[0].nodeValue = "Harga beli / kemasan";
+    const stockLabel = document.querySelector('label[for="inv-stok"]') || $("#inv-stok")?.closest("label");
+    if (stockLabel) stockLabel.childNodes[0].nodeValue = "Stok dasar (ml)";
+    const jualLabel = document.querySelector('label[for="inv-jual"]') || $("#inv-jual")?.closest("label");
+    if (jualLabel) jualLabel.childNodes[0].nodeValue = `Harga jual / ${sellSize.value || 100}ml`;
+
+    note.textContent =
+      `Stok disimpan dalam ml. Setiap qty transaksi menjual ${sellSize.value || 100} ml dan mengurangi stok sebesar itu, walaupun cairan yang dituangkan secara fisik kurang dari ${sellSize.value || 100} ml.`;
   } else {
     packSize.value = 1;
     sellSize.value = 1;
-    sellUnit.value = unit;
-    note.textContent = "Barang biasa memakai stok dan harga per unit. Untuk cairan/tinta, pilih ml agar sistem memisahkan kemasan beli dari unit jual.";
+    sellUnit.value = baseUnit;
+    if (packLabel) packLabel.childNodes[0].nodeValue = "Isi 1 kemasan beli";
+    if (sellSizeLabel) sellSizeLabel.childNodes[0].nodeValue = "Isi per penjualan";
+    if (sellUnitLabel) sellUnitLabel.childNodes[0].nodeValue = "Nama unit jual";
+    if (beliLabel) beliLabel.childNodes[0].nodeValue = "Harga beli / kemasan";
+    const stockLabel = $("#inv-stok")?.closest("label");
+    if (stockLabel) stockLabel.childNodes[0].nodeValue = "Stok dasar";
+    const jualLabel = $("#inv-jual")?.closest("label");
+    if (jualLabel) jualLabel.childNodes[0].nodeValue = "Harga jual / unit jual";
+
+    note.textContent =
+      "Barang biasa memakai stok dan harga per unit. Untuk tinta, head cleaner, thinner, atau alkohol IPA, gunakan kategori tinta/cairan dan satuan ml.";
   }
 }
 
@@ -1296,7 +1332,22 @@ function bind() {
 
   $("#clear-inventory").addEventListener("click", () => {
     state.editInventoryKey = null; state.editInventoryCategory = null;
-    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = "");
+    ["inv-nama","inv-beli","inv-jual","inv-stok"].forEach(id => $(`#${id}`).value = "");
+    $("#inv-kategori").value = "sparepart";
+    $("#inv-satuan").value = "pcs";
+    $("#inv-pack-size").value = "1";
+    $("#inv-sell-size").value = "1";
+    $("#inv-sell-unit").value = "pcs";
+    updateInventoryUnitUI();
+  });
+  $("#inv-kategori").addEventListener("change", () => {
+    const category = String($("#inv-kategori").value || "").toLowerCase();
+    const liquidCategory = category === "tinta" || category === "cairan";
+    const unit = $("#inv-satuan");
+    if (liquidCategory && unit && !isLiquidInventoryUnit(unit.value)) {
+      unit.value = "ml";
+    }
+    updateInventoryUnitUI();
   });
   $("#inv-satuan").addEventListener("change", updateInventoryUnitUI);
   $("#inv-sell-size").addEventListener("input", updateInventoryUnitUI);
@@ -1398,6 +1449,7 @@ watchAuth({
       window.location.href = "login.html";
     });
     bind();
+    renderPage("dashboard");
     resetServiceForm();
     $("#accounting-month").value ||= new Date().toISOString().slice(0, 7);
     $("#restock-date").value ||= new Date().toISOString().slice(0, 10);
