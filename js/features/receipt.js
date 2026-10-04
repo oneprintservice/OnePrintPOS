@@ -1,3 +1,5 @@
+import { getPrinterConfig, printThermal } from "./printer.js?v=20261005-premium2";
+
 const esc = value => String(value ?? "-")
   .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
   .replaceAll('"',"&quot;").replaceAll("'","&#39;");
@@ -319,4 +321,13 @@ export function printReceipt(data, tipe = "nota") {
   waitForPrintReady().then(() => {
     setTimeout(() => window.print(), 120);
   });
+}
+
+
+export async function printReceiptSmart(data, tipe = "nota") {
+  const config = getPrinterConfig();
+  if (config.mode === "bridge") {
+    return printThermal(data, tipe, config);
+  }
+  return printReceipt(data, tipe);
 }

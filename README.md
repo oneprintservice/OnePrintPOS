@@ -76,3 +76,7 @@ Visual redesign applied to the existing fix9 functionality. Firebase paths, serv
 
 
 Premium Blue mobile polish 1: restored compact 225px drawer and refined bottom-nav active FAB state.
+
+
+## Checkpoint — Premium Blue 2
+Mobile bottom navigation refined, scanner redesigned, thermal printer bridge added, and liquid inventory/restock now separates base stock (ml) from purchase packaging and sell unit (e.g. 100 ml).

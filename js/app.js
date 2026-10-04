@@ -6,9 +6,10 @@ import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
-import { printReceipt } from "./features/receipt.js?v=20261003-fix8";
+import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
 import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261003-fix8";
+import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261005-premium2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -166,8 +167,8 @@ function renderInventory() {
   const rows = state.inventory.filter(x => String(x.nama || "").toLowerCase().includes(q));
   $("#inventory-count").textContent = `${rows.length} item`;
   $("#inventory-list").innerHTML = rows.map(x => `<tr>
-    <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.kategori)} · ${escapeHtml(x.satuan || "pcs")}</small></td>
-    <td>${money(x.harga_jual)}</td><td>${x.stok ?? 0}</td><td>${money(x.harga_beli)}</td>
+    <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.kategori)} · stok ${escapeHtml(x.satuan || "pcs")} · jual ${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td>
+    <td>${money(x.harga_jual)}<small>${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td><td>${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "pcs")}</td><td>${money(x.harga_beli)}<small>/ kemasan</small></td>
     <td><span class="stock ${Number(x.stok || 0) <= Number(x.minimum || 1) ? "low" : ""}">${Number(x.stok || 0) <= Number(x.minimum || 1) ? "Menipis" : "Aman"}</span></td>
     <td><button class="table-action" data-edit-inv="${x.kategori}:${x.key}">Edit</button><button class="table-action danger" data-del-inv="${x.kategori}:${x.key}">Hapus</button></td>
   </tr>`).join("") || `<tr><td colspan="6" class="empty">Belum ada inventori.</td></tr>`;
@@ -178,7 +179,7 @@ function renderSuggestions() {
   const box = $("#suggestions");
   if (q.length < 2) { box.hidden = true; return; }
   const rows = state.inventory.filter(x => String(x.nama || "").toLowerCase().includes(q)).slice(0, 10);
-  box.innerHTML = rows.map(x => `<button class="suggestion" data-pick="${x.kategori}:${x.key}"><b>${escapeHtml(x.nama)}</b><span>${money(x.harga_jual)} · stok ${x.stok ?? 0} ${escapeHtml(x.satuan || "")}</span></button>`).join("");
+  box.innerHTML = rows.map(x => `<button class="suggestion" data-pick="${x.kategori}:${x.key}"><b>${escapeHtml(x.nama)}</b><span>${money(x.harga_jual)} / ${escapeHtml(x.satuan_jual || x.satuan || "pcs")} · stok ${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "")}</span></button>`).join("");
   box.hidden = !rows.length;
 }
 
@@ -268,7 +269,7 @@ function renderRestock() {
   $("#restock-list").innerHTML = rows.map((x, index) => `<tr data-restock-row="${escapeHtml(x.key)}">
     <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
     <td><strong>${escapeHtml(x.nama || x.itemKey || "-")}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
-    <td><strong>${Number(x.qty || 0).toLocaleString("id-ID")}</strong> ${escapeHtml(x.satuan || "")}</td>
+    <td><strong>${Number(x.qty_kemasan ?? x.qty ?? 0).toLocaleString("id-ID")}</strong> ${x.qty_kemasan != null ? "kemasan" : escapeHtml(x.satuan || "")}<small>${x.qty_kemasan != null ? `${Number(x.qty || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "")} masuk stok` : "riwayat lama"}</small></td>
     <td>${money(x.total)}</td>
     <td class="restock-action-cell">${
       index === 0
@@ -456,7 +457,13 @@ async function addCartItem() {
     const inv = state.inventory.find(x => x.key === state.selectedInventory.key && x.kategori === state.selectedInventory.kategori);
     if (inv) {
       item.key = inv.key; item.kategori = inv.kategori; item.dariInventori = true;
-      if (inv.kategori !== "jasa" && Number(inv.stok || 0) <= 0) return view.toast("Stok barang habis", "error");
+      if (inv.kategori !== "jasa") {
+        const unit = String(inv.satuan || "").toLowerCase();
+        const stockPerQty = (unit === "ml" || unit === "gram") ? Math.max(1, Number(inv.isi_jual) || 100) : 1;
+        if (Number(inv.stok || 0) < qty * stockPerQty) {
+          return view.toast(`Stok tidak cukup. Tersedia ${Number(inv.stok || 0).toLocaleString("id-ID")} ${inv.satuan || "unit"}.`, "error");
+        }
+      }
     }
   }
   state.items[state.tab].push(item);
@@ -662,7 +669,7 @@ async function saveCurrentService(print = false, type = "nota") {
 
   const changedStatus = statusOf(old) && statusOf(old) !== statusOf(data);
   view.toast(changedStatus ? `Status berubah: ${statusOf(old)} → ${statusOf(data)}` : "Perubahan servis berhasil disimpan", "success");
-  if (print) printReceipt(data, type);
+  if (print) await printReceiptSmart(data, type);
 }
 
 async function openService(key) {
@@ -804,6 +811,129 @@ function setMenu(open) {
   document.body.classList.toggle("menu-lock", open);
 }
 
+
+function isLiquidInventoryUnit(unit) {
+  const u = String(unit || "").toLowerCase();
+  return u === "ml" || u === "gram";
+}
+
+function updateInventoryUnitUI() {
+  const unit = $("#inv-satuan")?.value || "pcs";
+  const liquid = isLiquidInventoryUnit(unit);
+  const packSize = $("#inv-pack-size");
+  const sellSize = $("#inv-sell-size");
+  const sellUnit = $("#inv-sell-unit");
+  const note = $("#inventory-unit-note");
+  if (!packSize || !sellSize || !sellUnit) return;
+
+  if (liquid) {
+    if (!Number(packSize.value)) packSize.value = 1000;
+    if (!Number(sellSize.value)) sellSize.value = 100;
+    if (!sellUnit.value || /^(pcs|ml|gram|unit)$/i.test(sellUnit.value)) {
+      sellUnit.value = `${sellSize.value}${unit}`;
+    }
+    note.textContent = `Stok disimpan dalam ${unit}. Satu transaksi menjual ${sellSize.value} ${unit} per qty, sehingga pemakaian pelanggan < ${sellSize.value} tetap dibebankan 1 unit jual.`;
+  } else {
+    packSize.value = 1;
+    sellSize.value = 1;
+    sellUnit.value = unit;
+    note.textContent = "Barang biasa memakai stok dan harga per unit. Untuk cairan/tinta, pilih ml agar sistem memisahkan kemasan beli dari unit jual.";
+  }
+}
+
+function renderRestockCalculation() {
+  const box = $("#restock-calculation");
+  const select = $("#restock-item");
+  if (!box || !select) return;
+  const [kategori, key] = select.value.split("|");
+  const inv = state.inventory.find(x => x.kategori === kategori && x.key === key);
+  if (!inv) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+
+  const packages = Math.max(0, Number($("#restock-qty").value) || 0);
+  const packSize = Math.max(1, Number($("#restock-pack-size").value) || Number(inv.isi_kemasan_beli) || 1);
+  const price = Math.max(0, Number($("#restock-price").value) || Number(inv.harga_beli) || 0);
+  const liquid = isLiquidInventoryUnit(inv.satuan);
+  const added = packages * packSize;
+  const perBase = liquid ? price / packSize : price;
+
+  box.hidden = false;
+  box.innerHTML = `
+    <div><span>Akan masuk stok</span><strong>${added.toLocaleString("id-ID")} ${escapeHtml(inv.satuan || "pcs")}</strong></div>
+    <div><span>Total pembelian</span><strong>${money(packages * price)}</strong></div>
+    <div><span>HPP / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(perBase)}</strong></div>
+    ${liquid ? `<small>Contoh: ${packages || 1} kemasan × ${packSize.toLocaleString("id-ID")} ${escapeHtml(inv.satuan)}. Harga jual dihitung terpisah per unit jual.</small>` : ""}
+  `;
+}
+
+function getPrinterFormConfig() {
+  return {
+    mode: $("#printer-mode")?.value || "browser",
+    bridgeUrl: $("#printer-bridge-url")?.value.trim() || "http://127.0.0.1:18181",
+    transport: $("#printer-transport")?.value || "winspool",
+    printerName: $("#printer-name")?.value.trim() || "",
+    host: $("#printer-host")?.value.trim() || "",
+    port: Number($("#printer-port")?.value || 9100),
+    serialPath: $("#printer-serial")?.value.trim() || "",
+    baudRate: Number($("#printer-baud")?.value || 9600),
+    paper: $("#printer-paper")?.value || "58",
+    token: $("#printer-token")?.value || ""
+  };
+}
+
+function fillPrinterFormConfig(config = {}) {
+  const ids = {
+    "printer-mode": config.mode || "browser",
+    "printer-bridge-url": config.bridgeUrl || "http://127.0.0.1:18181",
+    "printer-transport": config.transport || "winspool",
+    "printer-name": config.printerName || "",
+    "printer-host": config.host || "",
+    "printer-port": config.port || 9100,
+    "printer-serial": config.serialPath || "",
+    "printer-baud": config.baudRate || 9600,
+    "printer-paper": config.paper || "58",
+    "printer-token": config.token || ""
+  };
+  Object.entries(ids).forEach(([id, value]) => {
+    const el = $(`#${id}`);
+    if (el) el.value = value;
+  });
+  updatePrinterTransportUI();
+}
+
+function updatePrinterTransportUI() {
+  const transport = $("#printer-transport")?.value || "winspool";
+  const win = transport === "winspool";
+  const net = transport === "network";
+  const serial = transport === "serial";
+  $("#printer-name-wrap")?.toggleAttribute("hidden", !win);
+  $("#printer-host-wrap")?.toggleAttribute("hidden", !net);
+  $("#printer-port-wrap")?.toggleAttribute("hidden", !net);
+  $("#printer-serial-wrap")?.toggleAttribute("hidden", !serial);
+  $("#printer-baud-wrap")?.toggleAttribute("hidden", !serial);
+}
+
+async function refreshPrinterBridgeStatus() {
+  const badge = $("#printer-bridge-status");
+  if (!badge) return;
+  try {
+    const cfg = getPrinterFormConfig();
+    if (cfg.mode !== "bridge") {
+      badge.textContent = "Mode browser";
+      return;
+    }
+    const result = await testPrinterBridge(cfg);
+    badge.textContent = result.ok ? "Bridge siap" : "Bridge gagal";
+    badge.classList.toggle("bridge-ok", !!result.ok);
+  } catch (err) {
+    badge.textContent = "Bridge gagal";
+    console.warn("OnePrint printer bridge:", err);
+  }
+}
+
 function bind() {
   if (uiBound) return;
   uiBound = true;
@@ -904,6 +1034,11 @@ function bind() {
         $("#inv-nama").value = x.nama; $("#inv-kategori").value = cat;
         $("#inv-beli").value = x.harga_beli || 0; $("#inv-jual").value = x.harga_jual || 0;
         $("#inv-stok").value = x.stok || 0; $("#inv-satuan").value = x.satuan || "pcs";
+        $("#inv-pack-size").value = x.isi_kemasan_beli || ((x.satuan || "").toLowerCase() === "ml" ? 1000 : 1);
+        $("#inv-sell-size").value = x.isi_jual || ((x.satuan || "").toLowerCase() === "ml" ? 100 : 1);
+        $("#inv-sell-unit").value = x.satuan_jual || (((x.satuan || "").toLowerCase() === "ml") ? `${x.isi_jual || 100}ml` : (x.satuan || "pcs"));
+        updateInventoryUnitUI();
+
         switchPage("inventory");
       }
       return;
@@ -1108,14 +1243,14 @@ function bind() {
     if (!state.editServiceKey) return view.toast("Buka servis tersimpan terlebih dahulu", "error");
     const data = await getService(state.editServiceKey);
     if (!data) return view.toast("Data servis tidak ditemukan", "error");
-    printReceipt(data, "tanda-terima");
+    await printReceiptSmart(data, "tanda-terima");
   });
 
   $("#reprint-invoice").addEventListener("click", async () => {
     if (!state.editServiceKey) return view.toast("Buka servis tersimpan terlebih dahulu", "error");
     const data = await getService(state.editServiceKey);
     if (!data) return view.toast("Data servis tidak ditemukan", "error");
-    printReceipt(data, "nota");
+    await printReceiptSmart(data, "nota");
   });
 
   $("#delete-service").addEventListener("click", removeCurrentService);
@@ -1147,25 +1282,72 @@ function bind() {
     const item = {
       nama: $("#inv-nama").value, kategori: $("#inv-kategori").value,
       harga_beli: $("#inv-beli").value, harga_jual: $("#inv-jual").value,
-      stok: $("#inv-stok").value, satuan: $("#inv-satuan").value
+      stok: $("#inv-stok").value, satuan: $("#inv-satuan").value,
+      isi_kemasan_beli: $("#inv-pack-size").value,
+      isi_jual: $("#inv-sell-size").value,
+      satuan_jual: $("#inv-sell-unit").value.trim()
     };
     if (!item.nama.trim()) return view.toast("Nama barang wajib diisi", "error");
     await saveInventory(item, state.editInventoryKey, state.editInventoryCategory);
     state.editInventoryKey = null; state.editInventoryCategory = null;
-    ["inv-nama","inv-beli","inv-jual","inv-stok"].forEach(id => $(`#${id}`).value = "");
+    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = "");
     await loadAll(); view.toast("Inventori berhasil disimpan", "success");
   });
 
   $("#clear-inventory").addEventListener("click", () => {
     state.editInventoryKey = null; state.editInventoryCategory = null;
-    ["inv-nama","inv-beli","inv-jual","inv-stok"].forEach(id => $(`#${id}`).value = "");
+    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = "");
   });
+  $("#inv-satuan").addEventListener("change", updateInventoryUnitUI);
+  $("#inv-sell-size").addEventListener("input", updateInventoryUnitUI);
+
+  $("#restock-qty").addEventListener("input", renderRestockCalculation);
+  $("#restock-pack-size").addEventListener("input", renderRestockCalculation);
+  $("#restock-price").addEventListener("input", renderRestockCalculation);
+
+  $("#printer-transport")?.addEventListener("change", updatePrinterTransportUI);
+  $("#printer-mode")?.addEventListener("change", refreshPrinterBridgeStatus);
+  $("#printer-save")?.addEventListener("click", () => {
+    savePrinterConfig(getPrinterFormConfig());
+    view.toast("Setting printer disimpan", "success");
+    refreshPrinterBridgeStatus();
+  });
+  $("#printer-test")?.addEventListener("click", async () => {
+    try {
+      const cfg = getPrinterFormConfig();
+      savePrinterConfig(cfg);
+      const result = await testPrinterBridge(cfg);
+      view.toast(result.ok ? "Bridge printer terhubung" : "Bridge printer tidak merespons", result.ok ? "success" : "error");
+      $("#printer-bridge-status").textContent = result.ok ? "Bridge siap" : "Bridge gagal";
+    } catch (err) {
+      view.toast(err.message || "Tes printer gagal", "error");
+    }
+  });
+  $("#printer-test-print")?.addEventListener("click", async () => {
+    try {
+      const cfg = getPrinterFormConfig();
+      savePrinterConfig(cfg);
+      await printTestReceipt(cfg);
+      view.toast("Perintah cetak tes terkirim", "success");
+    } catch (err) {
+      view.toast(err.message || "Cetak tes gagal", "error");
+    }
+  });
+
+  fillPrinterFormConfig(getPrinterConfig());
+  updateInventoryUnitUI();
+  renderRestockCalculation();
+
 
   $("#restock-search").addEventListener("input", renderRestock);
   $("#restock-item").addEventListener("change", () => {
     const [kategori, key] = $("#restock-item").value.split("|");
     const inv = state.inventory.find(x => x.kategori === kategori && x.key === key);
-    if (inv) $("#restock-price").value = Number(inv.harga_beli || 0);
+    if (inv) {
+      $("#restock-price").value = Number(inv.harga_beli || 0);
+      $("#restock-pack-size").value = Number(inv.isi_kemasan_beli || ((inv.satuan || "").toLowerCase() === "ml" ? 1000 : 1));
+      renderRestockCalculation();
+    }
   });
 
   $("#save-restock").addEventListener("click", async () => {
@@ -1174,9 +1356,10 @@ function bind() {
     const result = await createRestock({
       item: inv, kategori: inv.kategori, qty: $("#restock-qty").value,
       hargaBeli: $("#restock-price").value, supplier: $("#restock-supplier").value.trim(),
-      tanggal: $("#restock-date").value, catatan: $("#restock-note").value.trim()
+      tanggal: $("#restock-date").value, catatan: $("#restock-note").value.trim(),
+      isiKemasan: $("#restock-pack-size").value
     });
-    $("#restock-qty").value = ""; $("#restock-price").value = ""; $("#restock-supplier").value = ""; $("#restock-note").value = "";
+    $("#restock-qty").value = ""; $("#restock-price").value = ""; $("#restock-pack-size").value = "1"; $("#restock-supplier").value = ""; $("#restock-note").value = "";
     // The multi-path Firebase write has succeeded. Show its result immediately,
     // even if the subsequent history read is delayed or temporarily unavailable.
     state.restocks = [result, ...state.restocks.filter(x => x.key !== result.key)]

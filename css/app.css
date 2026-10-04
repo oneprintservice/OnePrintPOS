@@ -839,16 +839,17 @@ th,td{
     box-shadow:0 5px 15px rgba(11,115,255,.35);
   }
   .mobile-bottom-nav button.nav-fab{
-    color:#fff;
-    margin-top:-14px;
+    color:#9fb5d5;
+    margin-top:0;
+    background:transparent;
   }
   .mobile-bottom-nav button.nav-fab .mobile-nav-icon{
-    width:42px;
-    height:42px;
-    border-radius:14px;
-    background:linear-gradient(135deg,#1590ff,#075bd1);
-    box-shadow:0 9px 24px rgba(11,115,255,.38);
-    font-size:20px;
+    width:25px;
+    height:25px;
+    border-radius:9px;
+    background:transparent;
+    box-shadow:none;
+    font-size:18px;
   }
   .mobile-bottom-nav button small{
     font-size:8px;
@@ -880,17 +881,50 @@ th,td{
   .mobile-bottom-nav button.nav-fab.active{
     background:transparent!important;
     box-shadow:none!important;
-    color:#fff;
+    color:#9fb5d5;
   }
 
   .mobile-bottom-nav button.nav-fab.active .mobile-nav-icon{
-    background:linear-gradient(135deg,#1590ff,#075bd1);
-    box-shadow:0 9px 24px rgba(11,115,255,.38);
-    transform:translateY(-1px);
+    background:rgba(30,136,255,.18);
+    color:#fff;
+    box-shadow:none;
+    transform:none;
   }
 
   .mobile-bottom-nav button.active:not(.nav-fab){
     background:rgba(30,136,255,.16);
     box-shadow:none;
   }
+}
+
+.inventory-unit-note{
+  padding:10px 12px;
+  border:1px solid #dce9f8;
+  background:#f4f9ff;
+  color:#617a9c;
+  border-radius:12px;
+  font-size:10px;
+  line-height:1.45;
+}
+.restock-calculation{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  margin:-3px 0 12px;
+  padding:11px;
+  border:1px solid #dce9f8;
+  background:#f5faff;
+  border-radius:14px;
+}
+.restock-calculation div{display:flex;flex-direction:column;gap:3px}
+.restock-calculation span{font-size:9px;color:#6b82a2}
+.restock-calculation strong{font-size:12px;color:#12345f}
+.restock-calculation small{grid-column:1/-1;color:#71809a;font-size:9px}
+.printer-settings-panel{margin-top:18px}
+.printer-settings-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+#printer-bridge-status.bridge-ok{background:#e9fbf3;color:#0a8a59}
+@media(max-width:680px){
+  .restock-calculation{grid-template-columns:1fr 1fr}
+  .restock-calculation small{grid-column:1/-1}
+  .printer-settings-actions>*{flex:1}
 }
