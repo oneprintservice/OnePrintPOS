@@ -788,7 +788,7 @@ th,td{
   }
 
   .sidebar{
-    width:min(280px,88vw);
+    width:225px!important;
     box-shadow:25px 0 70px rgba(2,31,72,.25);
   }
 
@@ -864,5 +864,33 @@ th,td{
   .mobile-bottom-nav button[data-page="restock"],
   .mobile-bottom-nav button[data-page="accounting"]{
     display:none;
+  }
+}
+
+
+/* Premium Blue mobile polish 1:
+   keep the original compact 225px drawer and make the center FAB
+   active state icon-only instead of a large tile highlight. */
+@media(max-width:680px){
+  .sidebar{
+    width:225px!important;
+  }
+
+  .mobile-bottom-nav button.nav-fab,
+  .mobile-bottom-nav button.nav-fab.active{
+    background:transparent!important;
+    box-shadow:none!important;
+    color:#fff;
+  }
+
+  .mobile-bottom-nav button.nav-fab.active .mobile-nav-icon{
+    background:linear-gradient(135deg,#1590ff,#075bd1);
+    box-shadow:0 9px 24px rgba(11,115,255,.38);
+    transform:translateY(-1px);
+  }
+
+  .mobile-bottom-nav button.active:not(.nav-fab){
+    background:rgba(30,136,255,.16);
+    box-shadow:none;
   }
 }

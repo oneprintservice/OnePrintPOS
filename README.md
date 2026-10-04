@@ -73,3 +73,6 @@ Print reliability fix: receipt container is no longer cleared in afterprint beca
 
 ## Checkpoint — Premium Blue UI
 Visual redesign applied to the existing fix9 functionality. Firebase paths, service/restock logic, invoice quantity grouping, and QR tracking flow are unchanged.
+
+
+Premium Blue mobile polish 1: restored compact 225px drawer and refined bottom-nav active FAB state.
