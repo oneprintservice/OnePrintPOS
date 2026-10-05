@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b73ff">
 <title>OnePrint — Scanner & Thermal Print</title>
 <link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261005-status-gradient2">
+<link rel="stylesheet" href="css/app.css?v=20261006-unit-history">
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <style>
@@ -80,10 +80,10 @@
 <section class="scanner-card">
   <span class="eyebrow">QR TOOL</span>
   <h1>Generator & Scanner</h1>
-  <p class="scanner-sub">Buat identitas printer/servis, scan QR, lalu siapkan label thermal.</p>
+  <p class="scanner-sub">Buat identitas unit servis, scan QR, lalu siapkan label thermal.</p>
   <div class="scanner-fields">
     <input id="customer" type="text" placeholder="Nama pelanggan">
-    <input id="unit" type="text" placeholder="Jenis / tipe unit">
+    <input id="unit" type="text" placeholder="Merk / tipe unit">
     <input id="manualCode" type="text" placeholder="OPS-260105-001">
   </div>
   <div class="scanner-actions">
@@ -112,7 +112,7 @@
     <button class="scanner-btn ghost" onclick="fillManualCode()">Gunakan Hasil</button>
   </div>
   <div class="scan-status" id="scanStatus">Kamera belum aktif.</div>
-  <div class="scan-result"><small>Hasil scan terakhir</small><strong id="scanResult">Belum ada hasil</strong></div>
+  <div class="scan-result"><small>Hasil scan identitas unit terakhir</small><strong id="scanResult">Belum ada hasil</strong></div>
 
   <details class="printer-box">
     <summary>Pengaturan printer thermal</summary>
@@ -139,7 +139,7 @@
 <div id="printArea">
   <div style="text-align:center;font-family:Arial,sans-serif">
     <div style="font-size:10px;font-weight:700">ONEPRINT SERVICE</div>
-    <div style="font-size:8px">Printer • Laptop • IT Support</div>
+    <div style="font-size:8px">Identitas unit servis</div>
     <div style="border-top:1px dashed #000;margin:2px 0"></div>
     <div id="printCode" style="font-size:7px"></div>
     <div id="printCustomer" style="font-size:7px"></div>

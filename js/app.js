@@ -7,7 +7,7 @@ import {
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
 import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
-import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
+import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
 import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
 import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261005-premium2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
@@ -75,6 +75,7 @@ function currentForm() {
     telp: $("#input-telp").value.trim(),
     merk: $("#input-merk").value.trim(),
     serial: $("#barcode-input").value.trim(),
+    unitId: state.printerBarcode || $("#barcode-input").value.trim(),
     printerId: state.printerBarcode || $("#barcode-input").value.trim(),
     kelengkapan: $("#input-kelengkapan").value.trim(),
     keluhan: $("#input-keluhan").value.trim(),
@@ -188,7 +189,7 @@ function renderServiceTable() {
   const selectedStatus = $("#service-status-filter")?.value || "";
   const rows = filterOperationalServices(state.services).filter(x =>
     (!selectedStatus || statusOf(x) === selectedStatus) &&
-    [x.nomor, x.pelanggan, x.telp, x.merk, x.serial, x.status].some(v => String(v || "").toLowerCase().includes(q))
+    [x.nomor, x.unitId, x.printerId, x.pelanggan, x.telp, x.merk, x.serial, x.status].some(v => String(v || "").toLowerCase().includes(q))
   ).slice(0, 120);
 
   const serviceCount = $("#service-count");
@@ -533,7 +534,7 @@ function renderPrinterContext(printer, history = [], barcode = "") {
     el.hidden = false;
     el.innerHTML = `
       <div class="printer-context-head">
-        <span class="printer-found printer-new">＋ PRINTER BARU</span>
+        <span class="printer-found printer-new">＋ UNIT BARU</span>
         <strong>Identitas belum terdaftar</strong>
       </div>
       <div class="printer-context-grid">
@@ -541,45 +542,46 @@ function renderPrinterContext(printer, history = [], barcode = "") {
         <span>Status</span><b>Siap didaftarkan</b>
       </div>
       <small class="printer-history-empty">
-        Barcode ini akan disimpan sebagai identitas printer saat transaksi servis disimpan.
+        Kode ini akan disimpan sebagai identitas unit saat transaksi servis disimpan.
       </small>
     `;
     return;
   }
 
-  const recent = history.slice(0, 3).map(item =>
+  const recent = history.slice(0, 5).map(item =>
     `<li><strong>${escapeHtml(item.nomor || "-")}</strong> · ${escapeHtml(item.status || "-")} · ${escapeHtml(item.tanggal ? new Date(item.tanggal).toLocaleDateString("id-ID") : "-")}</li>`
   ).join("");
 
   el.hidden = false;
   el.innerHTML = `
     <div class="printer-context-head">
-      <span class="printer-found">✓ PRINTER DITEMUKAN</span>
+      <span class="printer-found">✓ UNIT DITEMUKAN</span>
       <strong>${escapeHtml(printer.merk || "Printer")}</strong>
     </div>
     <div class="printer-context-grid">
-      <span>ID Barcode</span><b>${escapeHtml(printer.barcode || "-")}</b>
+      <span>ID Unit</span><b>${escapeHtml(printer.unitId || printer.barcode || "-")}</b>
       <span>Serial</span><b>${escapeHtml(printer.serial || "-")}</b>
       <span>Pemilik</span><b>${escapeHtml(printer.pelanggan || "-")}</b>
       <span>Riwayat</span><b>${history.length} servis</b>
     </div>
-    ${history.length ? `<div class="printer-history"><small>Riwayat terakhir</small><ol>${recent}</ol></div>` : `<small class="printer-history-empty">Belum ada riwayat servis untuk printer ini.</small>`}
+    ${history.length ? `<div class="printer-history"><small>Riwayat servis terbaru</small><ol>${recent}</ol></div>` : `<small class="printer-history-empty">Belum ada riwayat servis untuk unit ini.</small>`}
   `;
 }
 
 async function loadPrinterIdentity(code, { notify = true } = {}) {
-  const barcode = String(code || "").trim();
-  if (!barcode) return null;
+  const unitId = String(code || "").trim();
+  if (!unitId) return null;
 
-  let printer = await getPrinter(barcode);
+  let unit = await getUnit(unitId);
 
-  if (!printer) {
-    // Compatibility with the old pelanggan/{serial} records.
-    const legacy = await findCustomer(barcode);
+  if (!unit) {
+    // Compatibility with old pelanggan/{serial} records.
+    const legacy = await findCustomer(unitId);
     if (legacy) {
-      printer = {
-        barcode,
-        serial: barcode,
+      unit = {
+        unitId,
+        barcode: unitId,
+        serial: unitId,
         nama: legacy.nama,
         pelanggan: legacy.nama,
         telp: legacy.telp,
@@ -589,34 +591,29 @@ async function loadPrinterIdentity(code, { notify = true } = {}) {
     }
   }
 
-  if (!printer) {
-    state.printerBarcode = barcode;
+  if (!unit) {
+    state.printerBarcode = unitId;
     state.selectedPrinter = null;
-
-    // Barcode hasil scan adalah IDENTITAS printer.
-    // Tampilkan kembali ke field agar operator dapat melihat dan
-    // memastikan kode yang akan disimpan sebelum transaksi disimpan.
     const input = $("#barcode-input");
-    if (input) input.value = barcode;
-
-    renderPrinterContext(null, [], barcode);
-    if (notify) view.toast(`Printer ${barcode} baru. Barcode siap disimpan sebagai identitas printer.`, "info");
+    if (input) input.value = unitId;
+    renderPrinterContext(null, [], unitId);
+    if (notify) view.toast(`Unit ${unitId} baru. Identitas siap didaftarkan.`, "info");
     return null;
   }
 
-  const history = await getPrinterHistory(barcode);
-  state.printerBarcode = barcode;
-  state.selectedPrinter = printer;
+  const history = await getUnitHistory(unitId);
+  state.printerBarcode = unitId;
+  state.selectedPrinter = unit;
 
-  $("#barcode-input").value = printer.serial || barcode;
-  $("#input-nama").value = printer.pelanggan || printer.nama || "";
-  $("#input-telp").value = printer.telp || "";
-  $("#input-merk").value = printer.merk || "";
-  $("#input-kelengkapan").value = printer.kelengkapan || "";
+  $("#barcode-input").value = unit.serial || unitId;
+  $("#input-nama").value = unit.pelanggan || unit.nama || "";
+  $("#input-telp").value = unit.telp || "";
+  $("#input-merk").value = unit.merk || "";
+  $("#input-kelengkapan").value = unit.kelengkapan || "";
 
-  renderPrinterContext(printer, history);
-  if (notify) view.toast(`Printer ${barcode} dikenali. Data pelanggan dimuat.`, "success");
-  return printer;
+  renderPrinterContext(unit, history);
+  if (notify) view.toast(`Unit ${unitId} dikenali. ${history.length} riwayat servis ditemukan.`, "success");
+  return unit;
 }
 
 async function saveCurrentService(print = false, type = "nota") {
@@ -637,6 +634,7 @@ async function saveCurrentService(print = false, type = "nota") {
     sparepart: state.items.sparepart,
     total: total(),
     teknisi: state.user?.email?.split("@")[0]?.toUpperCase() || "TEKNISI",
+    unitId: state.printerBarcode || f.serial || "",
     printerId: state.printerBarcode || f.serial || ""
   };
 
@@ -649,9 +647,9 @@ async function saveCurrentService(print = false, type = "nota") {
     data.diambilAt = old.diambilAt;
   }
 
-  if (data.printerId) {
-    await savePrinter({
-      barcode: data.printerId,
+  if (data.unitId) {
+    await saveUnit({
+      unitId: data.unitId,
       serial: data.serial,
       merk: data.merk,
       pelanggan: data.pelanggan,
