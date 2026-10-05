@@ -80,3 +80,20 @@ Premium Blue mobile polish 1: restored compact 225px drawer and refined bottom-n
 
 ## Checkpoint — Premium Blue 2
 Mobile bottom navigation refined, scanner redesigned, thermal printer bridge added, and liquid inventory/restock now separates base stock (ml) from purchase packaging and sell unit (e.g. 100 ml).
+
+
+## Printer profiles (fix11.3)
+
+OnePrint now separates the two physical printer roles:
+
+- **Printer Dokumen**: LaserJet/CUPS, A5, for nota and tanda terima.
+- **Printer Label Thermal**: separate thermal printer, preferably CUPS on MX Linux; can also use Windows Spooler, Wi-Fi/LAN TCP 9100, or Serial/Bluetooth COM/TTY.
+
+The existing A5 nota/tanda-terima browser layout is intentionally preserved. The document printer profile records the CUPS/Windows queue that will be used as the document target, while the thermal Bridge is used for label/ESC-POS output.
+
+For an MX Linux server, the intended final topology is:
+
+HP/browser -> Wi-Fi -> MX Linux Printer Bridge -> CUPS -> LaserJet A5
+                                           └-> CUPS -> Thermal Label
+
+The actual A5 server-side direct printing path should only be enabled after the real printer/CUPS environment is tested, so the existing A5 browser printing is not regressed.

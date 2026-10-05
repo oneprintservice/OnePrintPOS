@@ -1,5 +1,3 @@
-import { getPrinterConfig, printThermal } from "./printer.js?v=20261005-premium2";
-
 const esc = value => String(value ?? "-")
   .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
   .replaceAll('"',"&quot;").replaceAll("'","&#39;");
@@ -325,9 +323,8 @@ export function printReceipt(data, tipe = "nota") {
 
 
 export async function printReceiptSmart(data, tipe = "nota") {
-  const config = getPrinterConfig();
-  if (config.mode === "bridge") {
-    return printThermal(data, tipe, config);
-  }
+  // Nota dan tanda terima tetap dokumen A5 untuk LaserJet.
+  // Jangan diarahkan ke thermal hanya karena Bridge label sedang aktif.
+  // Jalur thermal disediakan terpisah melalui printThermal() untuk label.
   return printReceipt(data, tipe);
 }

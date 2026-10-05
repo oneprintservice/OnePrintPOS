@@ -34,13 +34,17 @@ function targetFromBody(target) {
     if (!target.host) throw new Error("IP printer belum diisi");
     return { type:"network", host:String(target.host), port:Number(target.port || 9100) };
   }
+  if (target.type === "cups") {
+    if (!target.printerName) throw new Error("Nama antrian printer CUPS belum diisi");
+    return { type:"cups", printerName:String(target.printerName), documentName:String(target.documentName || "OnePrint POS") };
+  }
   if (target.type === "serial") {
     if (!target.path) throw new Error("Port serial/Bluetooth belum diisi");
     return { type:"serial", path:String(target.path), baudRate:Number(target.baudRate || 9600) };
   }
   if (target.type === "winspool") {
     if (!target.printerName) throw new Error("Nama printer Windows belum diisi");
-    return { type:"winspool", printerName:String(target.printerName) };
+    return { type:"winspool", printerName:String(target.printerName), documentName:String(target.documentName || "OnePrint POS") };
   }
   throw new Error(`Transport tidak didukung: ${target.type}`);
 }
@@ -112,7 +116,7 @@ async function handle(req, res) {
 
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   if (req.method === "GET" && url.pathname === "/health") {
-    return json(res, 200, {ok:true,service:"oneprint-printer-bridge",version:"1.0.0"});
+    return json(res, 200, {ok:true,service:"oneprint-printer-bridge",version:"1.2.0"});
   }
   if (req.method !== "POST") return json(res, 404, {ok:false,message:"Not found"});
 

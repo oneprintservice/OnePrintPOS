@@ -909,31 +909,44 @@ function getPrinterFormConfig() {
   return {
     mode: $("#printer-mode")?.value || "browser",
     bridgeUrl: $("#printer-bridge-url")?.value.trim() || "http://127.0.0.1:18181",
-    transport: $("#printer-transport")?.value || "winspool",
-    printerName: $("#printer-name")?.value.trim() || "",
-    host: $("#printer-host")?.value.trim() || "",
-    port: Number($("#printer-port")?.value || 9100),
-    serialPath: $("#printer-serial")?.value.trim() || "",
-    baudRate: Number($("#printer-baud")?.value || 9600),
-    paper: $("#printer-paper")?.value || "58",
+    document: {
+      transport: $("#printer-document-transport")?.value || "cups",
+      printerName: $("#printer-document-name")?.value.trim() || "",
+      paper: $("#printer-document-paper")?.value || "A5"
+    },
+    thermal: {
+      transport: $("#printer-transport")?.value || "cups",
+      printerName: $("#printer-name")?.value.trim() || "",
+      host: $("#printer-host")?.value.trim() || "",
+      port: Number($("#printer-port")?.value || 9100),
+      serialPath: $("#printer-serial")?.value.trim() || "",
+      baudRate: Number($("#printer-baud")?.value || 9600),
+      paper: $("#printer-paper")?.value || "58"
+    },
     token: $("#printer-token")?.value || ""
   };
 }
 
 function fillPrinterFormConfig(config = {}) {
-  const ids = {
+  const thermal = config.thermal || {};
+  const document = config.document || {};
+  const legacy = !config.thermal && !config.document ? config : {};
+  const values = {
     "printer-mode": config.mode || "browser",
     "printer-bridge-url": config.bridgeUrl || "http://127.0.0.1:18181",
-    "printer-transport": config.transport || "winspool",
-    "printer-name": config.printerName || "",
-    "printer-host": config.host || "",
-    "printer-port": config.port || 9100,
-    "printer-serial": config.serialPath || "",
-    "printer-baud": config.baudRate || 9600,
-    "printer-paper": config.paper || "58",
+    "printer-document-transport": document.transport || "cups",
+    "printer-document-name": document.printerName || "",
+    "printer-document-paper": document.paper || "A5",
+    "printer-transport": thermal.transport || legacy.transport || "cups",
+    "printer-name": thermal.printerName || legacy.printerName || "",
+    "printer-host": thermal.host || legacy.host || "",
+    "printer-port": thermal.port || legacy.port || 9100,
+    "printer-serial": thermal.serialPath || legacy.serialPath || "",
+    "printer-baud": thermal.baudRate || legacy.baudRate || 9600,
+    "printer-paper": thermal.paper || legacy.paper || "58",
     "printer-token": config.token || ""
   };
-  Object.entries(ids).forEach(([id, value]) => {
+  Object.entries(values).forEach(([id, value]) => {
     const el = $(`#${id}`);
     if (el) el.value = value;
   });
@@ -941,15 +954,28 @@ function fillPrinterFormConfig(config = {}) {
 }
 
 function updatePrinterTransportUI() {
-  const transport = $("#printer-transport")?.value || "winspool";
+  const transport = $("#printer-transport")?.value || "cups";
+  const cups = transport === "cups";
   const win = transport === "winspool";
   const net = transport === "network";
   const serial = transport === "serial";
-  $("#printer-name-wrap")?.toggleAttribute("hidden", !win);
+  const nameLabel = $("#printer-name-label");
+  const nameInput = $("#printer-name");
+
+  $("#printer-name-wrap")?.toggleAttribute("hidden", !(win || cups));
   $("#printer-host-wrap")?.toggleAttribute("hidden", !net);
   $("#printer-port-wrap")?.toggleAttribute("hidden", !net);
   $("#printer-serial-wrap")?.toggleAttribute("hidden", !serial);
   $("#printer-baud-wrap")?.toggleAttribute("hidden", !serial);
+
+  if (nameLabel) {
+    nameLabel.textContent = cups
+      ? "Nama antrian CUPS"
+      : win
+        ? "Nama printer Windows"
+        : "Nama printer";
+  }
+  if (nameInput) nameInput.placeholder = cups ? "Thermal_Label" : "POS-80C";
 }
 
 async function refreshPrinterBridgeStatus() {
@@ -959,6 +985,7 @@ async function refreshPrinterBridgeStatus() {
     const cfg = getPrinterFormConfig();
     if (cfg.mode !== "bridge") {
       badge.textContent = "Mode browser";
+      badge.classList.remove("bridge-ok");
       return;
     }
     const result = await testPrinterBridge(cfg);
@@ -966,6 +993,7 @@ async function refreshPrinterBridgeStatus() {
     badge.classList.toggle("bridge-ok", !!result.ok);
   } catch (err) {
     badge.textContent = "Bridge gagal";
+    badge.classList.remove("bridge-ok");
     console.warn("OnePrint printer bridge:", err);
   }
 }
@@ -1358,6 +1386,8 @@ function bind() {
 
   $("#printer-transport")?.addEventListener("change", updatePrinterTransportUI);
   $("#printer-mode")?.addEventListener("change", refreshPrinterBridgeStatus);
+  $("#printer-document-transport")?.addEventListener("change", () => {});
+
   $("#printer-save")?.addEventListener("click", () => {
     savePrinterConfig(getPrinterFormConfig());
     view.toast("Setting printer disimpan", "success");

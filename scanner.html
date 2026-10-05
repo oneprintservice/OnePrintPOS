@@ -118,7 +118,7 @@
     <summary>Pengaturan printer thermal</summary>
     <div class="printer-form">
       <label>Mode<select id="printer-mode"><option value="browser">Browser</option><option value="bridge">Thermal Bridge</option></select></label>
-      <label>Transport<select id="printer-transport"><option value="winspool">USB / Windows</option><option value="network">Wi-Fi / LAN</option><option value="serial">Bluetooth / COM</option></select></label>
+      <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS</option><option value="winspool">USB / Windows</option><option value="network">Wi-Fi / LAN</option><option value="serial">Bluetooth / COM</option></select></label>
       <label class="span2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181"></label>
       <label id="printer-name-wrap">Nama printer<input id="printer-name" placeholder="POS-80C"></label>
       <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
@@ -149,7 +149,7 @@
 </div>
 
 <script type="module">
-import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt, printThermal } from "./js/features/printer.js?v=20261005-premium2";
+import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt, printThermal } from "./js/features/printer.js?v=20261005-premium4";
 
 const $ = id => document.getElementById(id);
 let html5QrCode = null;
@@ -159,33 +159,36 @@ function getConfigFromForm(){
   return {
     mode:$("printer-mode").value,
     bridgeUrl:$("printer-bridge-url").value.trim(),
-    transport:$("printer-transport").value,
-    printerName:$("printer-name").value.trim(),
-    host:$("printer-host").value.trim(),
-    port:Number($("printer-port").value||9100),
-    serialPath:$("printer-serial").value.trim(),
-    baudRate:Number($("printer-baud").value||9600),
-    paper:$("printer-paper").value,
+    thermal:{
+      transport:$("printer-transport").value,
+      printerName:$("printer-name").value.trim(),
+      host:$("printer-host").value.trim(),
+      port:Number($("printer-port").value||9100),
+      serialPath:$("printer-serial").value.trim(),
+      baudRate:Number($("printer-baud").value||9600),
+      paper:$("printer-paper").value
+    },
     token:$("printer-token").value
   };
 }
 function fillPrinter(){
   const c=getPrinterConfig();
+  const t=c.thermal||{};
   $("printer-mode").value=c.mode;
   $("printer-bridge-url").value=c.bridgeUrl;
-  $("printer-transport").value=c.transport;
-  $("printer-name").value=c.printerName||"";
-  $("printer-host").value=c.host||"";
-  $("printer-port").value=c.port||9100;
-  $("printer-serial").value=c.serialPath||"";
-  $("printer-baud").value=c.baudRate||9600;
-  $("printer-paper").value=c.paper||"58";
+  $("printer-transport").value=t.transport||"cups";
+  $("printer-name").value=t.printerName||"";
+  $("printer-host").value=t.host||"";
+  $("printer-port").value=t.port||9100;
+  $("printer-serial").value=t.serialPath||"";
+  $("printer-baud").value=t.baudRate||9600;
+  $("printer-paper").value=t.paper||"58";
   $("printer-token").value=c.token||"";
   updateTransport();
 }
 function updateTransport(){
   const t=$("printer-transport").value;
-  $("printer-name-wrap").hidden=t!=="winspool";
+  $("printer-name-wrap").hidden=!["winspool","cups"].includes(t);
   $("printer-host-wrap").hidden=t!=="network";
   $("printer-port-wrap").hidden=t!=="network";
   $("printer-serial-wrap").hidden=t!=="serial";

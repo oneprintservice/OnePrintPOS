@@ -44,21 +44,44 @@
 </div>
 
 <div class="panel printer-settings-panel">
-  <div class="panel-head"><div><span class="eyebrow">HARDWARE</span><h2>Printer Thermal</h2></div><span id="printer-bridge-status" class="count-pill">Belum dicek</span></div>
-  <p class="muted">OnePrint tetap bisa cetak browser. Jika bridge lokal aktif, mode thermal dapat mengirim ESC/POS ke USB, Wi-Fi, atau Bluetooth/serial.</p>
-  <div class="form-grid">
-    <label>Mode cetak<select id="printer-mode"><option value="browser">Browser / dialog cetak</option><option value="bridge">Thermal via Bridge</option></select></label>
-    <label>Transport<select id="printer-transport"><option value="winspool">USB / Windows Printer</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Bluetooth / COM</option></select></label>
-    <label class="span-2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181" placeholder="http://127.0.0.1:18181"></label>
-    <label id="printer-name-wrap">Nama printer Windows<input id="printer-name" placeholder="POS-80C"></label>
-    <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
-    <label id="printer-port-wrap" hidden>Port<input id="printer-port" type="number" value="9100"></label>
-    <label id="printer-serial-wrap" hidden>Port Bluetooth / Serial<input id="printer-serial" placeholder="COM3"></label>
-    <label id="printer-baud-wrap" hidden>Baud rate<input id="printer-baud" type="number" value="9600"></label>
-    <label>Lebar kertas<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
-    <label>Token bridge (opsional)<input id="printer-token" type="password" placeholder="Jika bridge diberi token"></label>
+  <div class="panel-head">
+    <div><span class="eyebrow">HARDWARE</span><h2>Printer</h2></div>
+    <span id="printer-bridge-status" class="count-pill">Belum dicek</span>
   </div>
-  <div class="printer-settings-actions"><button id="printer-save" class="primary">Simpan Setting</button><button id="printer-test" class="secondary">Tes Koneksi</button><button id="printer-test-print" class="ghost">Cetak Tes</button></div>
+  <p class="muted">Satu server MX Linux dapat menangani dua printer: LaserJet untuk nota/tanda terima A5 dan thermal untuk label. Keduanya dapat dikelola melalui CUPS; Bridge dipakai untuk jalur thermal ESC/POS.</p>
+
+  <div class="printer-profile-grid">
+    <div class="printer-profile-card">
+      <div class="profile-kicker">DOKUMEN</div>
+      <h3>Nota / Tanda Terima</h3>
+      <p class="muted">Tetap memakai layout A5 yang sudah ada. Printer tujuan disiapkan sebagai antrian CUPS di server Linux.</p>
+      <div class="form-grid">
+        <label>Printer dokumen<select id="printer-document-transport"><option value="cups">Linux / CUPS</option><option value="winspool">Windows / Spooler</option></select></label>
+        <label>Ukuran kertas<select id="printer-document-paper"><option value="A5">A5</option></select></label>
+        <label class="span-2">Nama antrian printer<input id="printer-document-name" placeholder="Contoh: LaserJet_A5"></label>
+      </div>
+      <small class="muted">Konfigurasi ini menjadi target dokumen. Pencetakan A5 melalui browser tetap dipertahankan agar format nota/TT tidak berubah.</small>
+    </div>
+
+    <div class="printer-profile-card">
+      <div class="profile-kicker">LABEL THERMAL</div>
+      <h3>Printer Label</h3>
+      <p class="muted">Digunakan untuk label kecil, QR, dan barcode. Printer thermal terpisah dari LaserJet A5.</p>
+      <div class="form-grid">
+        <label>Mode label<select id="printer-mode"><option value="browser">Browser / dialog cetak</option><option value="bridge">Thermal via Bridge</option></select></label>
+        <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS (USB)</option><option value="winspool">Windows / Spooler (USB)</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Serial / Bluetooth (COM / TTY)</option></select></label>
+        <label class="span-2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181" placeholder="http://192.168.1.10:18181"></label>
+        <label id="printer-name-wrap"><span id="printer-name-label">Nama antrian CUPS</span><input id="printer-name" placeholder="Thermal_Label"></label>
+        <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
+        <label id="printer-port-wrap" hidden>Port<input id="printer-port" type="number" value="9100"></label>
+        <label id="printer-serial-wrap" hidden>Port Serial / Bluetooth<input id="printer-serial" placeholder="COM3 atau /dev/ttyUSB0"></label>
+        <label id="printer-baud-wrap" hidden>Baud rate<input id="printer-baud" type="number" value="9600"></label>
+        <label>Lebar kertas<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
+        <label>Token bridge (opsional)<input id="printer-token" type="password" placeholder="Jika bridge diberi token"></label>
+      </div>
+      <div class="printer-settings-actions"><button id="printer-save" class="primary">Simpan Setting</button><button id="printer-test" class="secondary">Tes Bridge</button><button id="printer-test-print" class="ghost">Cetak Tes Thermal</button></div>
+    </div>
+  </div>
 </div>
 
 <div class="panel maintenance-panel">
@@ -110,4 +133,4 @@
 <div id="scanner-modal" class="modal scanner-modal"><div class="scanner-box"><div class="panel-head"><div><span class="eyebrow">SCANNER</span><h2>Scan Barcode / QR</h2></div><button id="scanner-close" class="icon-btn">×</button></div><div id="app-reader" class="app-reader"></div><p id="scanner-result" class="muted">Arahkan kamera ke barcode.</p></div></div>
 </div>
 <div id="toast" class="toast"></div><div id="modal" class="modal"><div class="modal-box"><div class="panel-head"><h2 id="modal-title">Detail</h2><button id="modal-close" class="icon-btn">×</button></div><div id="modal-body"></div></div></div>
-<script type="module" src="js/app.js?v=20261005-premium3"></script><div id="print-container" aria-hidden="true"></div></body></html>
+<script type="module" src="js/app.js?v=20261005-premium4"></script><div id="print-container" aria-hidden="true"></div></body></html>

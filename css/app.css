@@ -886,3 +886,10 @@ th,td{
   .restock-calculation small{grid-column:1/-1}
   .printer-settings-actions>*{flex:1}
 }
+
+.printer-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+.printer-profile-card{border:1px solid var(--border,#dbe3ef);border-radius:16px;padding:16px;background:var(--surface,#fff)}
+.printer-profile-card h3{margin:4px 0 6px}
+.profile-kicker{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--primary,#2563eb)}
+.printer-profile-card .form-grid{margin-top:12px}
+@media (max-width:800px){.printer-profile-grid{grid-template-columns:1fr}}
