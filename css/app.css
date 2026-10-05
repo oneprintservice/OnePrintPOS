@@ -893,3 +893,35 @@ th,td{
 .profile-kicker{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--primary,#2563eb)}
 .printer-profile-card .form-grid{margin-top:12px}
 @media (max-width:800px){.printer-profile-grid{grid-template-columns:1fr}}
+
+
+/* OnePrint POS status semantics — v11.4
+   Status colors are intentionally distinct so the workflow can be read at a glance. */
+.status-masuk{
+  background:#f1f5f9;
+  color:#475569;
+}
+.status-diagnosa{
+  background:#fff4bf;
+  color:#9a6700;
+}
+.status-dikerjakan{
+  background:#ffe0b2;
+  color:#b45309;
+}
+.status-menunggu-sparepart{
+  background:#ead3c2;
+  color:#7a4b2a;
+}
+.status-selesai{
+  background:#dcfce7;
+  color:#15803d;
+}
+.status-cancel{
+  background:#fee2e2;
+  color:#b91c1c;
+}
+.status-diambil{
+  background:#dbeafe;
+  color:#1d4ed8;
+}

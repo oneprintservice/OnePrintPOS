@@ -97,3 +97,13 @@ HP/browser -> Wi-Fi -> MX Linux Printer Bridge -> CUPS -> LaserJet A5
                                            └-> CUPS -> Thermal Label
 
 The actual A5 server-side direct printing path should only be enabled after the real printer/CUPS environment is tested, so the existing A5 browser printing is not regressed.
+
+
+## Fix11.4 — Status Colors
+- MASUK: slate/gray — baru diterima, belum diproses.
+- DIAGNOSA: amber/yellow — sedang pemeriksaan/penentuan kerusakan.
+- DIKERJAKAN: purple — pekerjaan/perbaikan sedang berlangsung.
+- MENUNGGU SPAREPART: orange — tertahan karena menunggu komponen.
+- SELESAI: green — pekerjaan selesai.
+- CANCEL: red — servis dibatalkan/berakhir tidak dilanjutkan.
+- DIAMBIL: blue — perangkat sudah diambil pelanggan.
