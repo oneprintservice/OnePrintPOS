@@ -46,7 +46,12 @@ export async function createRestock({
 
   const id = db.ref("restock").push().key;
   if (!id) throw new Error("Gagal membuat ID restock");
-  const date = tanggal ? new Date(`${tanggal}T12:00:00`).toISOString() : new Date().toISOString();
+  const date = tanggal
+    ? new Date(`${tanggal}T12:00:00`).toISOString()
+    : (() => {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0).toISOString();
+    })();
   const total = packages * unitCost;
 
   const restock = {

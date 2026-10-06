@@ -15,6 +15,15 @@ import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupC
 
 const $ = s => document.querySelector(s);
 const money = n => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
+
+// Business dates follow the browser's local calendar (WIB for the shop),
+// while event timestamps remain ISO/UTC. Never derive a business date/month
+// from toISOString(), because UTC can still be the previous calendar day.
+const localDateInput = (date = new Date()) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const localMonthInput = (date = new Date()) => localDateInput(date).slice(0, 7);
 let uiBound = false;
 let scanner = null;
 let idleCleanup = null;
@@ -66,7 +75,7 @@ const view = {
 const statusOf = x => String(x?.status || "").trim().toUpperCase();
 const dateInput = value => {
   const d = ledgerDate(value) || new Date();
-  return d.toISOString().slice(0, 10);
+  return localDateInput(d);
 };
 
 function currentForm() {
@@ -323,7 +332,7 @@ function accountingDateForService(service) {
 }
 
 function selectedAccountingMonth() {
-  return $("#accounting-month")?.value || new Date().toISOString().slice(0, 7);
+  return $("#accounting-month")?.value || localMonthInput();
 }
 
 function renderAccounting() {
@@ -400,7 +409,7 @@ function resetManualLedgerForm() {
 
   if (type) type.value = "PEMASUKAN";
   if (category) category.value = "OPERASIONAL";
-  if (date) date.value = new Date().toISOString().slice(0, 10);
+  if (date) date.value = localDateInput();
   if (amount) amount.value = "";
   if (note) note.value = "";
 
@@ -1479,9 +1488,9 @@ watchAuth({
     bind();
     renderPage("dashboard");
     resetServiceForm();
-    $("#accounting-month").value ||= new Date().toISOString().slice(0, 7);
-    $("#restock-date").value ||= new Date().toISOString().slice(0, 10);
-    $("#ledger-date").value ||= new Date().toISOString().slice(0, 10);
+    $("#accounting-month").value ||= localMonthInput();
+    $("#restock-date").value ||= localDateInput();
+    $("#ledger-date").value ||= localDateInput();
     await loadAll();
   },
   onSignedOut: () => {

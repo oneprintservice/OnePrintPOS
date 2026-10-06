@@ -74,7 +74,8 @@ export async function exportCleanupBackup(candidates) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   a.href = url;
   a.download = `oneprint-backup-servis-lama-${stamp}.json`;
   document.body.appendChild(a);
