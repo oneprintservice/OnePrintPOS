@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b73ff">
 <title>OnePrint — Scanner & Thermal Print</title>
 <link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261006-unit-history">
+<link rel="stylesheet" href="css/app.css?v=20261007-ui-cleanup">
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
 <style>
@@ -72,7 +72,7 @@
 <div class="scanner-page">
 <div class="scanner-shell">
 <header class="scanner-head">
-  <div class="scanner-brand"><img src="assets/logos.png" alt=""><div><b>ONEPRINT POS</b><small>Scanner & Thermal Center</small></div></div>
+  <div class="scanner-brand"><img src="assets/logos.png" alt=""><div><b>ONEPRINT POS</b><small>Scanner & Thermal</small></div></div>
   <a class="scanner-back" href="app.html">← Kembali ke POS</a>
 </header>
 
@@ -80,7 +80,7 @@
 <section class="scanner-card">
   <span class="eyebrow">QR TOOL</span>
   <h1>Generator & Scanner</h1>
-  <p class="scanner-sub">Buat identitas unit servis, scan QR, lalu siapkan label thermal.</p>
+  <p class="scanner-sub">Buat ID unit, scan QR, dan cetak label.</p>
   <div class="scanner-fields">
     <input id="customer" type="text" placeholder="Nama pelanggan">
     <input id="unit" type="text" placeholder="Merk / tipe unit">
@@ -93,7 +93,7 @@
   <div class="scanner-preview">
     <div>
       <canvas id="qrcode"></canvas>
-      <div class="preview-meta"><b id="previewCode">Belum dibuat</b><span id="previewInfo">QR akan muncul di sini</span></div>
+      <div class="preview-meta"><b id="previewCode">Belum dibuat</b><span id="previewInfo">QR muncul di sini</span></div>
     </div>
   </div>
   <div class="scanner-actions">
@@ -105,14 +105,14 @@
 <section class="scanner-card">
   <span class="eyebrow">CAMERA</span>
   <h2>Scan Barcode / QR</h2>
-  <p class="scanner-sub">Kamera belakang diprioritaskan. Hasil scan bisa langsung dipakai sebagai kode.</p>
+  <p class="scanner-sub">Gunakan kamera belakang untuk scan.</p>
   <div class="reader-wrap"><div id="reader"></div></div>
   <div class="scanner-actions">
     <button id="scanToggleBtn" class="scanner-btn primary" onclick="toggleScanner()">Mulai Scan</button>
     <button class="scanner-btn ghost" onclick="fillManualCode()">Gunakan Hasil</button>
   </div>
   <div class="scan-status" id="scanStatus">Kamera belum aktif.</div>
-  <div class="scan-result"><small>Hasil scan identitas unit terakhir</small><strong id="scanResult">Belum ada hasil</strong></div>
+  <div class="scan-result"><small>Hasil scan terakhir</small><strong id="scanResult">Belum ada hasil</strong></div>
 
   <details class="printer-box">
     <summary>Pengaturan printer thermal</summary>
@@ -127,8 +127,8 @@
       <label id="printer-baud-wrap" hidden>Baud<input id="printer-baud" type="number" value="9600"></label>
       <label>Lebar<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
       <label>Token<input id="printer-token" type="password"></label>
-      <div class="span2 bridge-note">USB memakai printer Windows/driver. Wi-Fi memakai TCP 9100. Bluetooth klasik dapat dipasangkan sebagai COM/serial. Browser modern memerlukan izin Local Network saat webapp HTTPS menghubungi bridge lokal.</div>
-      <button class="scanner-btn primary span2" onclick="savePrinterSettings()">Simpan & Tes Bridge</button>
+      <div class="span2 bridge-note">USB via driver, Wi-Fi via TCP 9100, Bluetooth via COM/serial.</div>
+      <button class="scanner-btn primary span2" onclick="savePrinterSettings()">Simpan & Tes</button>
     </div>
   </details>
 </section>

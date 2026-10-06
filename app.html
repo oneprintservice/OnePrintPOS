@@ -1,5 +1,5 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b73ff"><title>OnePrint POS V2</title><link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261007-accounting2">
+<link rel="stylesheet" href="css/app.css?v=20261007-ui-cleanup">
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script><script src="https://unpkg.com/html5-qrcode"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head><body>
 <div id="login-screen" hidden></div>
@@ -10,9 +10,9 @@
 <main class="main"><header class="topbar"><div class="topbar-left"><button id="menu-toggle" class="menu-toggle" aria-label="Buka menu" aria-expanded="false"><i></i><i></i><i></i></button><div><small class="eyebrow">ONEPRINT POS</small><h1 id="page-title">Dashboard</h1></div></div><button id="new-service" class="primary">＋ Transaksi Baru</button></header>
 <section id="page-dashboard" class="page active">
 <div class="welcome"><div><span class="eyebrow">OPERASIONAL HARI INI</span><h2>Ringkas, cepat, terkontrol.</h2>
-<div class="new-service-badge" id="new-badge" hidden>0 servis baru</div><p>Kelola servis printer, inventori, dan transaksi dari satu tempat.</p></div><button class="ghost" data-page="services">Lihat semua servis →</button></div>
-<div class="stats-grid"><button id="dashboard-aktif" class="stat-card"><span>Servis Aktif</span><b id="stat-aktif">0</b><small>Masuk · Diagnosa · Dikerjakan</small></button><button id="dashboard-sparepart" class="stat-card"><span>Menunggu Sparepart</span><b id="stat-sparepart">0</b><small>Perlu tindak lanjut</small></button><button id="dashboard-selesai" class="stat-card"><span>Selesai</span><b id="stat-selesai">0</b><small>Belum/siap diambil</small></button><div class="stat-card"><span>Total Servis</span><b id="stat-total">0</b><small>Seluruh data</small></div></div>
-<div class="section-head"><div><h3>Alur kerja</h3><p class="muted">Akses cepat untuk pekerjaan yang paling sering dilakukan.</p></div></div><div class="quick-grid"><button data-page="kasir"><b>＋ Terima Servis</b><span>Buat tanda terima baru</span></button><button data-page="services"><b>⌕ Cari Servis</b><span>Tracking dan edit data</span></button><button id="scan-printer"><b>▣ Scan Unit</b><span>Identifikasi unit & pelanggan</span></button><button data-page="inventory"><b>▤ Kelola Inventori</b><span>Stok, harga dan barang</span></button><a href="scanner.html"><b>⌁ Scanner QR</b><span>Scan / buat QR</span></a></div>
+<div class="new-service-badge" id="new-badge" hidden>0 servis baru</div><p>Servis, stok, dan transaksi.</p></div><button class="ghost" data-page="services">Lihat semua servis →</button></div>
+<div class="stats-grid"><button id="dashboard-aktif" class="stat-card"><span>Servis Aktif</span><b id="stat-aktif">0</b><small>Dalam proses</small></button><button id="dashboard-sparepart" class="stat-card"><span>Menunggu Sparepart</span><b id="stat-sparepart">0</b><small>Perlu tindakan</small></button><button id="dashboard-selesai" class="stat-card"><span>Selesai</span><b id="stat-selesai">0</b><small>Siap diambil</small></button><div class="stat-card"><span>Total Servis</span><b id="stat-total">0</b><small>Semua data</small></div></div>
+<div class="section-head"><div><h3>Alur kerja</h3><p class="muted">Akses cepat.</p></div></div><div class="quick-grid"><button data-page="kasir"><b>＋ Terima Servis</b><span>Buat tanda terima</span></button><button data-page="services"><b>⌕ Cari Servis</b><span>Cari & edit</span></button><button id="scan-printer"><b>▣ Scan Unit</b><span>Identifikasi unit</span></button><button data-page="inventory"><b>▤ Kelola Inventori</b><span>Stok & harga</span></button><a href="scanner.html"><b>⌁ Scanner QR</b><span>Scan & buat QR</span></a></div>
 </section>
 <section id="page-kasir" class="page"><div class="page-grid">
 <div class="panel"><div class="panel-head"><div><span class="eyebrow">FORM SERVIS</span><h2 id="service-mode">Transaksi Baru</h2></div><button id="delete-service" class="danger-link" hidden>Hapus</button></div>
@@ -33,13 +33,13 @@
 <div class="inventory-unit-note span-2" id="inventory-unit-note">Untuk tinta/cairan: stok disimpan dalam ml, tetapi transaksi dapat menjual per 100 ml.</div>
 <div class="form-actions"><button id="clear-inventory" class="ghost">Reset</button><button id="save-inventory" class="primary">Simpan Barang</button></div>
 </div></div><div class="panel"><div class="panel-head inventory-stock-head"><div class="inventory-stock-title"><span class="eyebrow">STOK AKTIF</span><h2>Semua Barang</h2></div><div class="inventory-stock-tools"><span id="inventory-count" class="count-pill">0 item</span><input id="inventory-search" class="search-small" placeholder="Cari barang..."></div></div><div class="table-wrap"><table><thead><tr><th>Barang</th><th>Jual</th><th>Stok</th><th>Beli</th><th>Kondisi</th><th></th></tr></thead><tbody id="inventory-list"></tbody></table></div></div></div></section>
-<section id="page-restock" class="page"><div class="page-grid"><div class="panel"><div class="panel-head"><div><span class="eyebrow">PEMBELIAN</span><h2>Restock Barang</h2></div></div><div class="notice">Pilih barang, jumlah dan harga beli. Stok otomatis bertambah dan pengeluaran masuk ke akuntansi.</div><div class="form-grid restock-form-grid"><label class="span-2">Barang<input id="restock-search" type="search" placeholder="Cari nama / kode / merk barang..."><select id="restock-item"><option value="">Pilih barang...</option></select></label><label>Jumlah kemasan<input id="restock-qty" type="number" min="1" step="1" placeholder="1"></label><label>Harga beli / kemasan<input id="restock-price" type="number" min="0" placeholder="160000"></label><label>Isi / kemasan<input id="restock-pack-size" type="number" min="1" step="1" value="1" placeholder="1000"></label><label>Supplier<input id="restock-supplier" placeholder="Nama supplier"></label><label>Tanggal<input id="restock-date" type="date"></label><label class="span-2">Catatan<input id="restock-note" placeholder="Contoh: 1 botol tinta hitam 1000ml"></label></div><div id="restock-calculation" class="restock-calculation" hidden></div><button id="save-restock" class="primary wide">Simpan Restock + Tambah Stok</button></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">RIWAYAT</span><h2>Restock Terbaru</h2></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Qty</th><th>Total</th><th></th></tr></thead><tbody id="restock-list"></tbody></table></div></div></div></section>
-<section id="page-accounting" class="page"><div class="panel accounting-head"><div><span class="eyebrow">LAPORAN KEUANGAN</span><h2>Akuntansi Sederhana</h2><p class="muted">Pemasukan servis dicatat saat DIAMBIL. Restock otomatis menjadi pengeluaran.</p></div><div class="accounting-head-actions"><label>Bulan laporan<input id="accounting-month" type="month"></label><button type="button" id="toggle-accounting-chart" class="secondary">▥ Lihat Grafik</button></div></div><div class="stats-grid accounting-stats"><div class="stat-card"><span>Pemasukan</span><b id="account-income">Rp 0</b><small>Transaksi masuk</small></div><div class="stat-card"><span>Pengeluaran</span><b id="account-expense">Rp 0</b><small>Restock + manual</small></div><div class="stat-card"><span>Laba Bersih</span><b id="account-net">Rp 0</b><small>Pemasukan - pengeluaran</small></div><div class="stat-card"><span>Periode</span><b id="account-month-label">-</b><small>Bulan laporan</small></div></div><div id="accounting-analysis" class="panel accounting-analysis" hidden>
+<section id="page-restock" class="page"><div class="page-grid"><div class="panel"><div class="panel-head"><div><span class="eyebrow">PEMBELIAN</span><h2>Restock</h2></div></div><div class="notice">Tambah stok dan catat pembelian.</div><div class="form-grid restock-form-grid"><label class="span-2">Barang<input id="restock-search" type="search" placeholder="Cari nama / kode / merk barang..."><select id="restock-item"><option value="">Pilih barang...</option></select></label><label>Jumlah kemasan<input id="restock-qty" type="number" min="1" step="1" placeholder="1"></label><label>Harga beli / kemasan<input id="restock-price" type="number" min="0" placeholder="160000"></label><label>Isi / kemasan<input id="restock-pack-size" type="number" min="1" step="1" value="1" placeholder="1000"></label><label>Supplier<input id="restock-supplier" placeholder="Nama supplier"></label><label>Tanggal<input id="restock-date" type="date"></label><label class="span-2">Catatan<input id="restock-note" placeholder="Contoh: 1 botol tinta hitam 1000ml"></label></div><div id="restock-calculation" class="restock-calculation" hidden></div><button id="save-restock" class="primary wide">Simpan Restock + Tambah Stok</button></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">RIWAYAT</span><h2>Restock Terbaru</h2></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Barang</th><th>Qty</th><th>Total</th><th></th></tr></thead><tbody id="restock-list"></tbody></table></div></div></div></section>
+<section id="page-accounting" class="page"><div class="panel accounting-head"><div><span class="eyebrow">LAPORAN KEUANGAN</span><h2>Akuntansi Sederhana</h2><p class="muted">Servis masuk saat DIAMBIL. Restock = pengeluaran.</p></div><div class="accounting-head-actions"><label>Bulan<input id="accounting-month" type="month"></label><button type="button" id="toggle-accounting-chart" class="secondary">▥ Lihat Grafik</button></div></div><div class="stats-grid accounting-stats"><div class="stat-card"><span>Pemasukan</span><b id="account-income">Rp 0</b><small>Pemasukan</small></div><div class="stat-card"><span>Pengeluaran</span><b id="account-expense">Rp 0</b><small>Restock + manual</small></div><div class="stat-card"><span>Laba Bersih</span><b id="account-net">Rp 0</b><small>Pemasukan − pengeluaran</small></div><div class="stat-card"><span>Periode</span><b id="account-month-label">-</b><small>Bulan</small></div></div><div id="accounting-analysis" class="panel accounting-analysis" hidden>
   <div class="panel-head accounting-analysis-head">
     <div>
-      <span class="eyebrow">ANALISIS 1 SIKLUS</span>
+      <span class="eyebrow">ANALISIS 12 BULAN</span>
       <h2>Grafik Tren Keuangan</h2>
-      <p class="muted">Lihat arah pendapatan, pengeluaran, dan laba bersih dalam satu siklus. Rentang maksimal 12 bulan.</p>
+      <p class="muted">Tren pendapatan, pengeluaran, dan laba bersih. Maks. 12 bulan.</p>
     </div>
     <button type="button" id="close-accounting-chart" class="ghost">Tutup</button>
   </div>
@@ -53,13 +53,13 @@
   <div id="accounting-chart" class="accounting-chart" aria-label="Grafik tren pendapatan, pengeluaran, dan laba bersih"></div>
   <div id="accounting-chart-detail" class="accounting-chart-detail"></div>
 </div>
-<div class="page-grid accounting-grid"><div class="panel"><div class="panel-head"><div><span class="eyebrow">CATAT MANUAL</span><h2>Transaksi Lain</h2></div></div><div class="form-grid"><label>Tipe<select id="ledger-type"><option>PEMASUKAN</option><option>PENGELUARAN</option></select></label><label>Kategori<select id="ledger-category"><option>OPERASIONAL</option><option>GAJI</option><option>SEWA</option><option>LAINNYA</option></select></label><label>Tanggal<input id="ledger-date" type="date"></label><label>Jumlah<input id="ledger-amount" type="number" min="0"></label><label class="span-2">Keterangan<input id="ledger-note" placeholder="Contoh: listrik, ongkir, pendapatan lain"></label></div><div class="manual-ledger-actions"><button type="button" id="save-manual-ledger" class="primary wide">Catat Transaksi</button><button type="button" id="cancel-manual-ledger" class="secondary wide" hidden>Batal Edit</button></div></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">BUKU KAS</span><h2>Transaksi Bulan Dipilih</h2></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Keterangan</th><th>Jumlah</th><th></th></tr></thead><tbody id="ledger-list"></tbody></table></div></div></div></section>
+<div class="page-grid accounting-grid"><div class="panel"><div class="panel-head"><div><span class="eyebrow">CATAT MANUAL</span><h2>Transaksi Lain</h2></div></div><div class="form-grid"><label>Tipe<select id="ledger-type"><option>PEMASUKAN</option><option>PENGELUARAN</option></select></label><label>Kategori<select id="ledger-category"><option>OPERASIONAL</option><option>GAJI</option><option>SEWA</option><option>LAINNYA</option></select></label><label>Tanggal<input id="ledger-date" type="date"></label><label>Jumlah<input id="ledger-amount" type="number" min="0"></label><label class="span-2">Keterangan<input id="ledger-note" placeholder="Contoh: listrik, ongkir, pendapatan lain"></label></div><div class="manual-ledger-actions"><button type="button" id="save-manual-ledger" class="primary wide">Catat Transaksi</button><button type="button" id="cancel-manual-ledger" class="secondary wide" hidden>Batal Edit</button></div></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">BUKU KAS</span><h2>Transaksi Bulan Ini</h2></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Keterangan</th><th>Jumlah</th><th></th></tr></thead><tbody id="ledger-list"></tbody></table></div></div></div></section>
 <section id="page-tools" class="page">
 <div class="quick-grid">
   <a href="scanner.html"><b>⌁ Scanner QR</b><span>Scan kode servis dan buat QR</span></a>
-  <a href="pln.html"><b>⚡ Cetak PLN</b><span>Template cetak PLN</span></a>
-  <a href="internet.html"><b>◉ Cetak Internet</b><span>Template cetak internet</span></a>
-  <button type="button" id="open-maintenance" class="tool-card"><b>⌫ Pemeliharaan Data</b><span>Arsipkan & bersihkan servis lama</span></button>
+  <a href="pln.html"><b>⚡ Cetak PLN</b><span>Template PLN</span></a>
+  <a href="internet.html"><b>◉ Cetak Internet</b><span>Template Internet</span></a>
+  <button type="button" id="open-maintenance" class="tool-card"><b>⌫ Pemeliharaan Data</b><span>Backup & bersihkan data lama</span></button>
 </div>
 
 <div class="panel printer-settings-panel">
@@ -67,25 +67,25 @@
     <div><span class="eyebrow">HARDWARE</span><h2>Printer</h2></div>
     <span id="printer-bridge-status" class="count-pill">Belum dicek</span>
   </div>
-  <p class="muted">Satu server MX Linux dapat menangani dua printer: LaserJet untuk nota/tanda terima A5 dan thermal untuk label. Keduanya dapat dikelola melalui CUPS; Bridge dipakai untuk jalur thermal ESC/POS.</p>
+  <p class="muted">MX Linux menangani LaserJet A5 dan thermal. CUPS untuk antrian, Bridge untuk thermal.</p>
 
   <div class="printer-profile-grid">
     <div class="printer-profile-card">
       <div class="profile-kicker">DOKUMEN</div>
       <h3>Nota / Tanda Terima</h3>
-      <p class="muted">Tetap memakai layout A5 yang sudah ada. Printer tujuan disiapkan sebagai antrian CUPS di server Linux.</p>
+      <p class="muted">Nota/TT tetap A5. Printer memakai antrian CUPS.</p>
       <div class="form-grid">
         <label>Printer dokumen<select id="printer-document-transport"><option value="cups">Linux / CUPS</option><option value="winspool">Windows / Spooler</option></select></label>
         <label>Ukuran kertas<select id="printer-document-paper"><option value="A5">A5</option></select></label>
         <label class="span-2">Nama antrian printer<input id="printer-document-name" placeholder="Contoh: LaserJet_A5"></label>
       </div>
-      <small class="muted">Konfigurasi ini menjadi target dokumen. Pencetakan A5 melalui browser tetap dipertahankan agar format nota/TT tidak berubah.</small>
+      <small class="muted">Target dokumen. Cetak browser tetap tersedia.</small>
     </div>
 
     <div class="printer-profile-card">
       <div class="profile-kicker">LABEL THERMAL</div>
       <h3>Printer Label</h3>
-      <p class="muted">Digunakan untuk label kecil, QR, dan barcode. Printer thermal terpisah dari LaserJet A5.</p>
+      <p class="muted">Untuk label, QR, dan barcode. Terpisah dari LaserJet.</p>
       <div class="form-grid">
         <label>Mode label<select id="printer-mode"><option value="browser">Browser / dialog cetak</option><option value="bridge">Thermal via Bridge</option></select></label>
         <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS (USB)</option><option value="winspool">Windows / Spooler (USB)</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Serial / Bluetooth (COM / TTY)</option></select></label>
@@ -111,21 +111,21 @@
     </div>
     <span id="maintenance-count" class="count-pill">0 kandidat</span>
   </div>
-  <p class="muted">Hanya servis <strong>DIAMBIL</strong> atau <strong>CANCEL</strong> yang sudah lebih dari 3 bulan yang dapat dibersihkan. Servis yang belum selesai tidak akan pernah ikut terhapus.</p>
+  <p class="muted">Hanya <strong>DIAMBIL</strong> atau <strong>CANCEL</strong> di luar 2 bulan kalender yang dapat dibersihkan. Servis aktif tetap aman.</p>
   <div class="maintenance-summary">
-    <div><small>Total servis</small><b id="maintenance-total">0</b></div>
-    <div><small>Aktif / belum selesai</small><b id="maintenance-active">0</b></div>
-    <div><small>Kandidat &gt; 3 bulan</small><b id="maintenance-candidates">0</b></div>
+    <div><small>Total</small><b id="maintenance-total">0</b></div>
+    <div><small>Aktif</small><b id="maintenance-active">0</b></div>
+    <div><small>Di luar 2 bulan</small><b id="maintenance-candidates">0</b></div>
   </div>
   <div class="maintenance-actions">
-    <button type="button" id="maintenance-refresh" class="secondary">↻ Periksa Data</button>
-    <button type="button" id="maintenance-export" class="ghost">↓ Export Backup Kandidat</button>
-    <button type="button" id="maintenance-clean" class="primary danger-solid">Bersihkan Data Lama</button>
+    <button type="button" id="maintenance-refresh" class="secondary">↻ Periksa</button>
+    <button type="button" id="maintenance-export" class="ghost">↓ Backup</button>
+    <button type="button" id="maintenance-clean" class="primary danger-solid">Bersihkan</button>
   </div>
   <div class="table-wrap maintenance-table-wrap">
     <table>
       <thead><tr><th>Nomor</th><th>Pelanggan</th><th>Status</th><th>Tanggal Acuan</th><th>Total</th></tr></thead>
-      <tbody id="maintenance-list"><tr><td colspan="5" class="empty">Tekan “Periksa Data” untuk melihat kandidat.</td></tr></tbody>
+      <tbody id="maintenance-list"><tr><td colspan="5" class="empty">Tekan “Periksa” untuk melihat kandidat.</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -152,4 +152,4 @@
 <div id="scanner-modal" class="modal scanner-modal"><div class="scanner-box"><div class="panel-head"><div><span class="eyebrow">SCANNER</span><h2>Scan Barcode / QR</h2></div><button id="scanner-close" class="icon-btn">×</button></div><div id="app-reader" class="app-reader"></div><p id="scanner-result" class="muted">Arahkan kamera ke barcode.</p></div></div>
 </div>
 <div id="toast" class="toast"></div><div id="modal" class="modal"><div class="modal-box"><div class="panel-head"><h2 id="modal-title">Detail</h2><button id="modal-close" class="icon-btn">×</button></div><div id="modal-body"></div></div></div>
-<script type="module" src="js/app.js?v=20261007-accounting2"></script><div id="print-container" aria-hidden="true"></div></body></html>
+<script type="module" src="js/app.js?v=20261007-ui-cleanup"></script><div id="print-container" aria-hidden="true"></div></body></html>

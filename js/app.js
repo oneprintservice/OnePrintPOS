@@ -314,7 +314,7 @@ function renderMaintenance(services = state.services) {
     <td><span class="status status-${statusOf(x).toLowerCase()}">${escapeHtml(statusOf(x))}</span></td>
     <td>${formatCleanupDate(x._cleanupDate)}</td>
     <td>${money(x.total)}</td>
-  </tr>`).join("") || `<tr><td colspan="5" class="empty">Tidak ada servis DIAMBIL/CANCEL yang lebih dari 3 bulan.</td></tr>`;
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">Tidak ada data lama.</td></tr>`;
 
   const cleanBtn = $("#maintenance-clean");
   const exportBtn = $("#maintenance-export");
@@ -1395,7 +1395,7 @@ function bind() {
         renderMaintenance(latest);
         renderStats();
         renderServiceTable();
-        view.toast(`Pemeriksaan selesai. ${state.maintenanceCandidates.length} kandidat ditemukan.`, "success");
+        view.toast(`Pemeriksaan selesai. ${state.maintenanceCandidates.length} kandidat.`, "success");
       } catch (err) {
         console.error("OnePrint maintenance refresh:", err);
         view.toast(`Gagal memeriksa data: ${err?.message || "koneksi Firebase bermasalah."}`, "error");
@@ -1409,7 +1409,7 @@ function bind() {
       try {
         await exportCleanupBackup(candidates);
         state.maintenanceBackupExported = true;
-        view.toast(`Backup ${candidates.length} servis berhasil dibuat.`, "success");
+        view.toast(`Backup ${candidates.length} data berhasil dibuat.`, "success");
       } catch (err) {
         console.error("OnePrint maintenance export:", err);
         view.toast("Backup gagal dibuat.", "error");
@@ -1422,20 +1422,20 @@ function bind() {
       if (!candidates.length) return view.toast("Tidak ada kandidat yang bisa dibersihkan.", "info");
 
       const confirmed = confirm(
-        `Hapus permanen ${candidates.length} servis DIAMBIL/CANCEL yang lebih dari 3 bulan?\\n\\n` +
+        `Hapus permanen ${candidates.length} data lama?\\n\\n` +
         `Servis yang masih aktif, SELESAI, atau belum selesai tidak akan disentuh.\\n` +
         `Data yang dihapus tidak dapat dipulihkan. Sebaiknya export backup terlebih dahulu.`
       );
       if (!confirmed) return;
 
-      const second = confirm(`Konfirmasi terakhir: hapus ${candidates.length} data servis lama sekarang?`);
+      const second = confirm(`Konfirmasi terakhir: hapus ${candidates.length} data lama sekarang?`);
       if (!second) return;
 
       try {
         const removed = await cleanupCandidates(candidates);
         state.maintenanceBackupExported = false;
         await loadAll();
-        view.toast(`${removed} data servis lama berhasil dibersihkan.`, "success");
+        view.toast(`${removed} data lama berhasil dibersihkan.`, "success");
       } catch (err) {
         console.error("OnePrint maintenance cleanup:", err);
         await loadAll();
