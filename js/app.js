@@ -335,6 +335,199 @@ function selectedAccountingMonth() {
   return $("#accounting-month")?.value || localMonthInput();
 }
 
+
+function monthIndex(value) {
+  const m = String(value || "").match(/^(\d{4})-(\d{2})$/);
+  if (!m) return NaN;
+  return Number(m[1]) * 12 + Number(m[2]) - 1;
+}
+
+function monthFromIndex(index) {
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function monthLabel(value) {
+  const m = String(value || "").match(/^(\d{4})-(\d{2})$/);
+  if (!m) return value || "-";
+  return new Date(Number(m[1]), Number(m[2]) - 1, 1, 12).toLocaleDateString("id-ID", {
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function defaultAccountingRange() {
+  const end = monthIndex(localMonthInput());
+  return {
+    start: monthFromIndex(end - 12),
+    end: monthFromIndex(end)
+  };
+}
+
+function accountingRangeValues() {
+  const defaults = defaultAccountingRange();
+  return {
+    start: $("#accounting-range-start")?.value || defaults.start,
+    end: $("#accounting-range-end")?.value || defaults.end
+  };
+}
+
+function collectAccountingRange(start, end) {
+  const startIndex = monthIndex(start);
+  const endIndex = monthIndex(end);
+  if (!Number.isFinite(startIndex) || !Number.isFinite(endIndex)) {
+    throw new Error("Rentang bulan belum lengkap.");
+  }
+  if (startIndex > endIndex) {
+    throw new Error("Bulan mulai tidak boleh setelah bulan akhir.");
+  }
+  if (endIndex - startIndex > 12) {
+    throw new Error("Rentang maksimal 12 bulan.");
+  }
+
+  const months = [];
+  for (let i = startIndex; i <= endIndex; i++) {
+    months.push(monthFromIndex(i));
+  }
+
+  const rows = months.map(month => ({ month, income: 0, expense: 0, net: 0, transactions: 0 }));
+  const byMonth = new Map(rows.map(row => [row.month, row]));
+
+  // Manual + restock expenses/income are taken from the finance ledger.
+  state.ledger.forEach(item => {
+    const month = ledgerMonth(item.tanggal);
+    const bucket = byMonth.get(month);
+    if (!bucket || String(item.sumber || "").toUpperCase() === "SERVIS") return;
+    const amount = Math.max(0, Number(item.jumlah) || 0);
+    if (String(item.tipe || "").toUpperCase() === "PEMASUKAN") bucket.income += amount;
+    if (String(item.tipe || "").toUpperCase() === "PENGELUARAN") bucket.expense += amount;
+    if (amount > 0) bucket.transactions += 1;
+  });
+
+  // Service income is derived from DIAMBIL so the payment date remains authoritative.
+  state.services.forEach(service => {
+    if (statusOf(service) !== "DIAMBIL") return;
+    const month = accountingMonthForService(service);
+    const bucket = byMonth.get(month);
+    if (!bucket) return;
+    const amount = Math.max(0, Number(service.total) || 0);
+    bucket.income += amount;
+    if (amount > 0) bucket.transactions += 1;
+  });
+
+  rows.forEach(row => { row.net = row.income - row.expense; });
+  return rows;
+}
+
+function renderAccountingChart() {
+  const chart = $("#accounting-chart");
+  const summary = $("#accounting-chart-summary");
+  const error = $("#accounting-range-error");
+  if (!chart || !summary) return;
+
+  const { start, end } = accountingRangeValues();
+  const startEl = $("#accounting-range-start");
+  const endEl = $("#accounting-range-end");
+  if (startEl) startEl.value = start;
+  if (endEl) endEl.value = end;
+
+  try {
+    const rows = collectAccountingRange(start, end);
+    if (error) { error.hidden = true; error.textContent = ""; }
+
+    const totalIncome = rows.reduce((sum, row) => sum + row.income, 0);
+    const totalExpense = rows.reduce((sum, row) => sum + row.expense, 0);
+    const totalNet = totalIncome - totalExpense;
+    const activeMonths = rows.filter(row => row.income || row.expense);
+    const avgIncome = rows.length ? totalIncome / rows.length : 0;
+    const best = rows.reduce((bestRow, row) => row.income > bestRow.income ? row : bestRow, rows[0]);
+
+    summary.innerHTML = `
+      <div class="accounting-summary-card"><span>Total pemasukan</span><strong>${money(totalIncome)}</strong><small>${rows.length} bulan</small></div>
+      <div class="accounting-summary-card"><span>Total pengeluaran</span><strong>${money(totalExpense)}</strong><small>Restock + manual</small></div>
+      <div class="accounting-summary-card"><span>Laba bersih</span><strong>${money(totalNet)}</strong><small>Pemasukan - pengeluaran</small></div>
+      <div class="accounting-summary-card"><span>Rata-rata pemasukan</span><strong>${money(avgIncome)}</strong><small>Per bulan dalam rentang</small></div>
+    `;
+
+    if (!rows.some(row => row.income || row.expense)) {
+      chart.innerHTML = `<div class="accounting-chart-empty">Belum ada transaksi pada rentang ${escapeHtml(monthLabel(start))} – ${escapeHtml(monthLabel(end))}.</div>`;
+      return;
+    }
+
+    const width = Math.max(760, rows.length * 76);
+    const height = 330;
+    const pad = { top: 28, right: 24, bottom: 58, left: 64 };
+    const innerW = width - pad.left - pad.right;
+    const innerH = height - pad.top - pad.bottom;
+    const minValue = Math.min(0, ...rows.map(row => row.net));
+    const maxValue = Math.max(1, ...rows.flatMap(row => [row.income, row.expense, row.net]));
+    const tickCount = 4;
+    const groupW = innerW / rows.length;
+    const barW = Math.min(15, groupW * 0.16);
+    const gap = Math.min(5, groupW * 0.05);
+    const valueSpan = Math.max(1, maxValue - minValue);
+    const y = value => pad.top + ((maxValue - value) / valueSpan) * innerH;
+    const zeroY = y(0);
+    const fmtShort = value => {
+      const n = Number(value || 0);
+      if (n >= 1000000) return `Rp ${(n / 1000000).toFixed(1).replace(".", ",")}jt`;
+      if (n >= 1000) return `Rp ${(n / 1000).toFixed(0)}rb`;
+      return `Rp ${n.toLocaleString("id-ID")}`;
+    };
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik pemasukan, pengeluaran, dan laba bersih">
+      <rect x="0" y="0" width="${width}" height="${height}" rx="12" fill="#ffffff"/>`;
+
+    for (let i = 0; i <= tickCount; i++) {
+      const value = maxValue - (valueSpan * i / tickCount);
+      const yy = y(value);
+      svg += `<line x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}" stroke="${Math.abs(value) < valueSpan / 100 ? "#cfd7e3" : "#e8edf4"}" stroke-width="${Math.abs(value) < valueSpan / 100 ? "1.4" : "1"}"/>`;
+      svg += `<text x="${pad.left - 10}" y="${yy + 4}" text-anchor="end" font-size="10" fill="#7b8798">${escapeHtml(fmtShort(value))}</text>`;
+    }
+
+    rows.forEach((row, index) => {
+      const center = pad.left + groupW * index + groupW / 2;
+      const xIncome = center - barW - gap;
+      const xExpense = center;
+      const xNet = center + gap;
+      const bars = [
+        { x: xIncome, value: row.income, fill: "#2563eb", label: "Pemasukan" },
+        { x: xExpense, value: row.expense, fill: "#f59e0b", label: "Pengeluaran" },
+        { x: xNet, value: row.net, fill: row.net < 0 ? "#dc2626" : "#16a34a", label: "Laba bersih" }
+      ];
+      bars.forEach(bar => {
+        const valueY = y(bar.value);
+        const barY = bar.value >= 0 ? valueY : zeroY;
+        const barH = Math.max(1, Math.abs(zeroY - valueY));
+        svg += `<rect x="${bar.x}" y="${barY}" width="${barW}" height="${barH}" rx="3" fill="${bar.fill}">
+          <title>${escapeHtml(`${bar.label} ${monthLabel(row.month)}: ${money(bar.value)}`)}</title>
+        </rect>`;
+      });
+      svg += `<text x="${center}" y="${height - 28}" text-anchor="middle" font-size="10" fill="#667085">${escapeHtml(monthLabel(row.month))}</text>`;
+    });
+
+    svg += `<line x1="${pad.left}" y1="${zeroY}" x2="${width - pad.right}" y2="${zeroY}" stroke="#cfd7e3" stroke-width="1.2"/>`;
+    svg += `</svg>`;
+
+    chart.innerHTML = `
+      <div class="accounting-legend">
+        <span><i style="background:#2563eb"></i>Pemasukan</span>
+        <span><i style="background:#f59e0b"></i>Pengeluaran</span>
+        <span><i style="background:#16a34a"></i>Laba bersih</span>
+      </div>
+      ${svg}
+    `;
+  } catch (err) {
+    if (error) {
+      error.hidden = false;
+      error.textContent = err.message || "Rentang tidak valid.";
+    }
+    summary.innerHTML = "";
+    chart.innerHTML = "";
+  }
+}
+
 function renderAccounting() {
   const month = selectedAccountingMonth();
 
@@ -397,6 +590,9 @@ function renderAccounting() {
 
   const cancelBtn = $("#cancel-manual-ledger");
   if (cancelBtn) cancelBtn.hidden = !state.editLedgerKey;
+
+  const chartPanel = $("#accounting-analysis");
+  if (chartPanel && !chartPanel.hidden) renderAccountingChart();
 }
 
 function resetManualLedgerForm() {
@@ -1340,6 +1536,34 @@ function bind() {
     });
   }
   $("#accounting-month").addEventListener("change", renderAccounting);
+
+  $("#toggle-accounting-chart")?.addEventListener("click", () => {
+    const panel = $("#accounting-analysis");
+    if (!panel) return;
+    const willOpen = panel.hidden;
+    panel.hidden = !willOpen;
+    const button = $("#toggle-accounting-chart");
+    if (button) button.textContent = willOpen ? "▥ Sembunyikan Grafik" : "▥ Lihat Grafik";
+    if (willOpen) {
+      const defaults = defaultAccountingRange();
+      const start = $("#accounting-range-start");
+      const end = $("#accounting-range-end");
+      if (start && !start.value) start.value = defaults.start;
+      if (end && !end.value) end.value = defaults.end;
+      renderAccountingChart();
+    }
+  });
+
+  $("#close-accounting-chart")?.addEventListener("click", () => {
+    const panel = $("#accounting-analysis");
+    if (panel) panel.hidden = true;
+    const button = $("#toggle-accounting-chart");
+    if (button) button.textContent = "▥ Lihat Grafik";
+  });
+
+  $("#apply-accounting-range")?.addEventListener("click", renderAccountingChart);
+  $("#accounting-range-start")?.addEventListener("change", renderAccountingChart);
+  $("#accounting-range-end")?.addEventListener("change", renderAccountingChart);
 
   $("#find-service-code").addEventListener("click", async () => {
     const code = $("#service-code-input").value.trim();

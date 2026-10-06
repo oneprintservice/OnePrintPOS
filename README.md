@@ -32,3 +32,11 @@ Basis: fix11.5.
 
 ## Prinsip QR
 QR label fisik tetap berisi `unitId` (contoh `OPS-PRN-000127`), bukan URL.
+
+
+## fix11.8 — Accounting range analysis + restock form cleanup
+- Accounting now has an interactive 1-cycle range chart (max 12 months between start/end).
+- Chart aggregates service income from DIAMBIL date plus manual/restock ledger entries.
+- Monthly view remains available; chart range is independent.
+- Ledger load limit increased to 5000 to cover longer analysis ranges more reliably.
+- Fixed hidden restock calculation panel overriding the HTML `hidden` attribute, which caused a blank stacked field below Catatan.
