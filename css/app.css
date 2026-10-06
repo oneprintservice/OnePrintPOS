@@ -957,3 +957,67 @@ th,td{
   .accounting-range-form button{grid-column:1/-1;width:100%}
   .accounting-chart-summary{grid-template-columns:1fr 1fr}
 }
+
+/* Accounting analytics — v11.9 */
+.accounting-summary-card strong.negative{color:#dc2626}
+.accounting-chart{padding:14px 14px 10px}
+.accounting-chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 2px 10px}
+.accounting-chart-note{font-size:9px;color:#98a2b3}
+.accounting-chart svg{min-width:820px}
+.accounting-chart-detail{margin-top:16px;border:1px solid #e7edf5;border-radius:16px;background:#fff;overflow:hidden}
+.accounting-detail-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 12px;border-bottom:1px solid #edf1f6}
+.accounting-detail-head h3{margin:3px 0 0;font-size:16px;color:#12345f}
+.accounting-detail-meta{font-size:9px;font-weight:700;color:#7b8798;background:#f6f8fb;border:1px solid #e7edf5;border-radius:999px;padding:7px 10px;white-space:nowrap}
+.accounting-detail-table{width:100%;min-width:680px}
+.accounting-detail-table th{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#667085;background:#f8fafc}
+.accounting-detail-table td{font-size:10px;color:#344054}
+.accounting-detail-table .money-in{color:#2563eb;font-weight:800}
+.accounting-detail-table .money-out{color:#dc2626;font-weight:800}
+.accounting-detail-table .money-net{color:#15803d;font-weight:800}
+.accounting-detail-table .money-negative{color:#dc2626;font-weight:800}
+.accounting-detail-foot{padding:10px 16px;border-top:1px solid #edf1f6;color:#8a94a6;font-size:9px;line-height:1.5}
+
+/* Restock form — more breathing room and a cleaner professional rhythm */
+.restock-form-grid{
+  column-gap:16px;
+  row-gap:18px;
+}
+.restock-form-grid label{
+  gap:8px;
+}
+.restock-form-grid label input,
+.restock-form-grid label select{
+  min-height:44px;
+  padding:11px 12px;
+  border-radius:12px;
+}
+.restock-form-grid #restock-search{
+  min-height:44px;
+}
+.restock-form-grid + .restock-calculation{
+  margin-top:18px;
+}
+.restock-calculation{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+  margin:18px 0 16px;
+  padding:14px;
+  border-radius:15px;
+}
+.restock-calculation div{
+  min-height:58px;
+  justify-content:center;
+  padding:4px 6px;
+}
+.restock-calculation span{font-size:9px}
+.restock-calculation strong{font-size:13px}
+@media(max-width:680px){
+  .accounting-chart-toolbar{align-items:flex-start;flex-direction:column}
+  .accounting-chart-note{padding-left:4px}
+  .accounting-detail-head{align-items:flex-start;flex-direction:column}
+  .accounting-detail-meta{white-space:normal}
+  .accounting-detail-table{min-width:620px}
+  .restock-form-grid{row-gap:18px}
+  .restock-form-grid label input,
+  .restock-form-grid label select{min-height:46px}
+}

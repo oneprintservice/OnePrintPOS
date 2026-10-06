@@ -127,7 +127,7 @@ function renderCart() {
 }
 
 async function loadAll() {
-  const tasks = await Promise.allSettled([listInventory(), listServices(), listRestocks(), listLedger()]);
+  const tasks = await Promise.allSettled([listInventory(), listServices(), listRestocks(), listLedger(Number.POSITIVE_INFINITY)]);
   state.inventory = tasks[0].status === "fulfilled" ? tasks[0].value : [];
   state.services = tasks[1].status === "fulfilled" ? tasks[1].value : [];
   // Preserve already-visible history if a Firebase read temporarily fails.
@@ -423,6 +423,7 @@ function collectAccountingRange(start, end) {
 function renderAccountingChart() {
   const chart = $("#accounting-chart");
   const summary = $("#accounting-chart-summary");
+  const detail = $("#accounting-chart-detail");
   const error = $("#accounting-range-error");
   if (!chart || !summary) return;
 
@@ -439,85 +440,144 @@ function renderAccountingChart() {
     const totalIncome = rows.reduce((sum, row) => sum + row.income, 0);
     const totalExpense = rows.reduce((sum, row) => sum + row.expense, 0);
     const totalNet = totalIncome - totalExpense;
-    const activeMonths = rows.filter(row => row.income || row.expense);
     const avgIncome = rows.length ? totalIncome / rows.length : 0;
+    const activeMonths = rows.filter(row => row.income || row.expense).length;
     const best = rows.reduce((bestRow, row) => row.income > bestRow.income ? row : bestRow, rows[0]);
 
     summary.innerHTML = `
-      <div class="accounting-summary-card"><span>Total pemasukan</span><strong>${money(totalIncome)}</strong><small>${rows.length} bulan</small></div>
-      <div class="accounting-summary-card"><span>Total pengeluaran</span><strong>${money(totalExpense)}</strong><small>Restock + manual</small></div>
-      <div class="accounting-summary-card"><span>Laba bersih</span><strong>${money(totalNet)}</strong><small>Pemasukan - pengeluaran</small></div>
-      <div class="accounting-summary-card"><span>Rata-rata pemasukan</span><strong>${money(avgIncome)}</strong><small>Per bulan dalam rentang</small></div>
+      <div class="accounting-summary-card">
+        <span>Total pendapatan</span>
+        <strong>${money(totalIncome)}</strong>
+        <small>${activeMonths} bulan aktif</small>
+      </div>
+      <div class="accounting-summary-card">
+        <span>Total pengeluaran</span>
+        <strong>${money(totalExpense)}</strong>
+        <small>Restock + manual</small>
+      </div>
+      <div class="accounting-summary-card">
+        <span>Laba bersih</span>
+        <strong class="${totalNet < 0 ? "negative" : ""}">${money(totalNet)}</strong>
+        <small>Pendapatan - pengeluaran</small>
+      </div>
+      <div class="accounting-summary-card">
+        <span>Rata-rata pendapatan</span>
+        <strong>${money(avgIncome)}</strong>
+        <small>Per bulan dalam rentang</small>
+      </div>
     `;
 
     if (!rows.some(row => row.income || row.expense)) {
       chart.innerHTML = `<div class="accounting-chart-empty">Belum ada transaksi pada rentang ${escapeHtml(monthLabel(start))} – ${escapeHtml(monthLabel(end))}.</div>`;
+      if (detail) detail.innerHTML = "";
       return;
     }
 
-    const width = Math.max(760, rows.length * 76);
-    const height = 330;
-    const pad = { top: 28, right: 24, bottom: 58, left: 64 };
+    const width = Math.max(820, rows.length * 78);
+    const height = 340;
+    const pad = { top: 28, right: 28, bottom: 62, left: 76 };
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
-    const minValue = Math.min(0, ...rows.map(row => row.net));
-    const maxValue = Math.max(1, ...rows.flatMap(row => [row.income, row.expense, row.net]));
-    const tickCount = 4;
-    const groupW = innerW / rows.length;
-    const barW = Math.min(15, groupW * 0.16);
-    const gap = Math.min(5, groupW * 0.05);
+    const values = rows.flatMap(row => [row.income, row.expense, row.net, 0]);
+    const minValue = Math.min(0, ...values);
+    const maxValue = Math.max(1, ...values);
     const valueSpan = Math.max(1, maxValue - minValue);
     const y = value => pad.top + ((maxValue - value) / valueSpan) * innerH;
     const zeroY = y(0);
+    const stepX = rows.length > 1 ? innerW / (rows.length - 1) : innerW / 2;
+    const x = index => rows.length === 1 ? pad.left + innerW / 2 : pad.left + index * stepX;
+
     const fmtShort = value => {
       const n = Number(value || 0);
-      if (n >= 1000000) return `Rp ${(n / 1000000).toFixed(1).replace(".", ",")}jt`;
-      if (n >= 1000) return `Rp ${(n / 1000).toFixed(0)}rb`;
-      return `Rp ${n.toLocaleString("id-ID")}`;
+      const sign = n < 0 ? "-" : "";
+      const abs = Math.abs(n);
+      if (abs >= 1000000) return `${sign}Rp ${(abs / 1000000).toFixed(1).replace(".", ",")}jt`;
+      if (abs >= 1000) return `${sign}Rp ${(abs / 1000).toFixed(0)}rb`;
+      return `${sign}Rp ${abs.toLocaleString("id-ID")}`;
     };
 
-    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik pemasukan, pengeluaran, dan laba bersih">
-      <rect x="0" y="0" width="${width}" height="${height}" rx="12" fill="#ffffff"/>`;
+    const series = [
+      { key: "income", label: "Pendapatan", stroke: "#2563eb" },
+      { key: "expense", label: "Pengeluaran", stroke: "#ef4444" },
+      { key: "net", label: "Laba bersih", stroke: "#16a34a" }
+    ];
 
+    const pointsFor = key => rows.map((row, index) => `${x(index).toFixed(1)},${y(row[key]).toFixed(1)}`).join(" ");
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik tren pendapatan, pengeluaran, dan laba bersih">
+      <rect x="0" y="0" width="${width}" height="${height}" rx="14" fill="#ffffff"/>`;
+
+    const tickCount = 4;
     for (let i = 0; i <= tickCount; i++) {
       const value = maxValue - (valueSpan * i / tickCount);
       const yy = y(value);
-      svg += `<line x1="${pad.left}" y1="${yy}" x2="${width - pad.right}" y2="${yy}" stroke="${Math.abs(value) < valueSpan / 100 ? "#cfd7e3" : "#e8edf4"}" stroke-width="${Math.abs(value) < valueSpan / 100 ? "1.4" : "1"}"/>`;
-      svg += `<text x="${pad.left - 10}" y="${yy + 4}" text-anchor="end" font-size="10" fill="#7b8798">${escapeHtml(fmtShort(value))}</text>`;
+      const isZero = Math.abs(value) < valueSpan / 100;
+      svg += `<line x1="${pad.left}" y1="${yy.toFixed(1)}" x2="${width - pad.right}" y2="${yy.toFixed(1)}" stroke="${isZero ? "#cbd5e1" : "#edf1f6"}" stroke-width="${isZero ? "1.5" : "1"}"/>`;
+      svg += `<text x="${pad.left - 12}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#7b8798">${escapeHtml(fmtShort(value))}</text>`;
     }
 
     rows.forEach((row, index) => {
-      const center = pad.left + groupW * index + groupW / 2;
-      const xIncome = center - barW - gap;
-      const xExpense = center;
-      const xNet = center + gap;
-      const bars = [
-        { x: xIncome, value: row.income, fill: "#2563eb", label: "Pemasukan" },
-        { x: xExpense, value: row.expense, fill: "#f59e0b", label: "Pengeluaran" },
-        { x: xNet, value: row.net, fill: row.net < 0 ? "#dc2626" : "#16a34a", label: "Laba bersih" }
-      ];
-      bars.forEach(bar => {
-        const valueY = y(bar.value);
-        const barY = bar.value >= 0 ? valueY : zeroY;
-        const barH = Math.max(1, Math.abs(zeroY - valueY));
-        svg += `<rect x="${bar.x}" y="${barY}" width="${barW}" height="${barH}" rx="3" fill="${bar.fill}">
-          <title>${escapeHtml(`${bar.label} ${monthLabel(row.month)}: ${money(bar.value)}`)}</title>
-        </rect>`;
-      });
-      svg += `<text x="${center}" y="${height - 28}" text-anchor="middle" font-size="10" fill="#667085">${escapeHtml(monthLabel(row.month))}</text>`;
+      const xx = x(index);
+      svg += `<line x1="${xx.toFixed(1)}" y1="${pad.top}" x2="${xx.toFixed(1)}" y2="${height - pad.bottom}" stroke="#f5f7fa" stroke-width="1"/>`;
+      svg += `<text x="${xx.toFixed(1)}" y="${height - 26}" text-anchor="middle" font-size="10" fill="#667085">${escapeHtml(monthLabel(row.month))}</text>`;
     });
 
-    svg += `<line x1="${pad.left}" y1="${zeroY}" x2="${width - pad.right}" y2="${zeroY}" stroke="#cfd7e3" stroke-width="1.2"/>`;
+    if (minValue < 0) {
+      svg += `<line x1="${pad.left}" y1="${zeroY.toFixed(1)}" x2="${width - pad.right}" y2="${zeroY.toFixed(1)}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+    }
+
+    series.forEach(item => {
+      svg += `<polyline points="${pointsFor(item.key)}" fill="none" stroke="${item.stroke}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      rows.forEach((row, index) => {
+        const xx = x(index);
+        const yy = y(row[item.key]);
+        const label = `${item.label} — ${monthLabel(row.month)}: ${money(row[item.key])}`;
+        svg += `<circle cx="${xx.toFixed(1)}" cy="${yy.toFixed(1)}" r="4.5" fill="#fff" stroke="${item.stroke}" stroke-width="2.5"><title>${escapeHtml(label)}</title></circle>`;
+      });
+    });
+
     svg += `</svg>`;
 
     chart.innerHTML = `
-      <div class="accounting-legend">
-        <span><i style="background:#2563eb"></i>Pemasukan</span>
-        <span><i style="background:#f59e0b"></i>Pengeluaran</span>
-        <span><i style="background:#16a34a"></i>Laba bersih</span>
+      <div class="accounting-chart-toolbar">
+        <div class="accounting-legend">
+          ${series.map(item => `<span><i style="background:${item.stroke}"></i>${item.label}</span>`).join("")}
+        </div>
+        <span class="accounting-chart-note">Hover titik untuk melihat nilai bulan tersebut</span>
       </div>
       ${svg}
     `;
+
+    if (detail) {
+      detail.innerHTML = `
+        <div class="accounting-detail-head">
+          <div>
+            <span class="eyebrow">RINCIAN PER BULAN</span>
+            <h3>Ringkasan periode</h3>
+          </div>
+          <span class="accounting-detail-meta">${rows.length} bulan · ${activeMonths} bulan bertransaksi</span>
+        </div>
+        <div class="table-wrap">
+          <table class="accounting-detail-table">
+            <thead>
+              <tr><th>Bulan</th><th>Pendapatan</th><th>Pengeluaran</th><th>Laba Bersih</th><th>Transaksi</th></tr>
+            </thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>
+                  <td><strong>${escapeHtml(monthLabel(row.month))}</strong></td>
+                  <td class="money-in">${money(row.income)}</td>
+                  <td class="money-out">${money(row.expense)}</td>
+                  <td class="${row.net < 0 ? "money-negative" : "money-net"}">${money(row.net)}</td>
+                  <td>${Number(row.transactions || 0).toLocaleString("id-ID")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="accounting-detail-foot">Bulan tanpa transaksi tetap ditampilkan sebagai Rp0. Pendapatan servis hanya dihitung saat status DIAMBIL.</div>
+      `;
+    }
   } catch (err) {
     if (error) {
       error.hidden = false;
@@ -525,6 +585,7 @@ function renderAccountingChart() {
     }
     summary.innerHTML = "";
     chart.innerHTML = "";
+    if (detail) detail.innerHTML = "";
   }
 }
 
