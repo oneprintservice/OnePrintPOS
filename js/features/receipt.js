@@ -82,15 +82,22 @@ const PRINT_CSS = `
   }
   .client-data label { font-weight:bold; white-space:nowrap; }
   .display-data {
-    display:flex;
-    align-items:flex-start;
     border-bottom:1px dotted #ccc;
     min-height:15px;
     text-transform:uppercase;
     padding-left:2px;
+    display:grid;
+    grid-template-columns:7px minmax(0,1fr);
+    column-gap:1px;
+    align-items:start;
   }
-  .display-data .colon { flex:none; margin-right:4px; }
-  .display-data .val { flex:1; min-width:0; overflow-wrap:anywhere; }
+  .display-colon {
+    width:7px;
+    display:block;
+  }
+  .display-value {
+    min-width:0;
+  }
   .service-table {
     width:100%;
     border-collapse:collapse;
@@ -198,7 +205,7 @@ export function buildReceipt(data, tipe = "nota") {
   const kopHeader = `
     <div class="header">
       <div class="header-left">
-        <img src="${logoPath}" class="logo-image" onerror="this.onerror=null;this.src='assets/logos.png'">
+        <img src="${logoPath}" class="logo-image" onerror="this.src='assets/logos.png'">
         <div class="company-info">
           <div class="company-name">OnePrint Service</div>
           <p class="tagline italic">Melayani Perbaikan Printer, Laptop, dan Komputer</p>
@@ -214,12 +221,12 @@ export function buildReceipt(data, tipe = "nota") {
 
   const clientGrid = `
     <div class="client-data">
-      <label>Pelanggan</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(nama)}</span></span>
-      <label>Tanggal</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(tgl)}</span></span>
-      <label>Telepon</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(telp)}</span></span>
-      <label>Merk/Tipe</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(merk)}</span></span>
-      <label>Serial No.</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(sn)}</span></span>
-      <label>Kelengkapan</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(kelengkapan)}</span></span>
+      <label>Pelanggan</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(nama)}</span></span>
+      <label>Tanggal</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(tgl)}</span></span>
+      <label>Telepon</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(telp)}</span></span>
+      <label>Merk/Tipe</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(merk)}</span></span>
+      <label>Serial No.</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(sn)}</span></span>
+      <label>Kelengkapan</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(kelengkapan)}</span></span>
     </div>`;
 
   let mainContent = "";
@@ -283,18 +290,14 @@ export function printReceipt(data, tipe = "nota") {
   const container = ensurePrintContainer();
   container.innerHTML = buildReceipt(data, tipe);
 
-  try {
-    const qr = container.querySelector("#qr-print");
-    if (qr && window.QRCode) {
-      qr.innerHTML = "";
-      new window.QRCode(qr, {
-        text: `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(data.nomor || "")}`,
-        width: 110,
-        height: 110
-      });
-    }
-  } catch (err) {
-    console.error("QR gagal dibuat:", err);
+  const qr = container.querySelector("#qr-print");
+  if (qr && window.QRCode) {
+    qr.innerHTML = "";
+    new window.QRCode(qr, {
+      text: `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(data.nomor || "")}`,
+      width: 110,
+      height: 110
+    });
   }
 
   // Jangan mengosongkan print-container pada "afterprint".
@@ -324,19 +327,9 @@ export function printReceipt(data, tipe = "nota") {
     ));
   };
 
-  const maxWait = new Promise(resolve => setTimeout(resolve, 2500));
-  Promise.race([waitForPrintReady(), maxWait])
-    .catch(err => console.error("Persiapan cetak bermasalah:", err))
-    .then(() => {
-      setTimeout(() => {
-        try {
-          window.print();
-        } catch (err) {
-          console.error("window.print gagal:", err);
-          alert("Dialog cetak gagal dibuka: " + (err && err.message ? err.message : err));
-        }
-      }, 120);
-    });
+  waitForPrintReady().then(() => {
+    setTimeout(() => window.print(), 120);
+  });
 }
 
 
