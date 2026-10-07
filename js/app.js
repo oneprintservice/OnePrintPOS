@@ -6,7 +6,7 @@ import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
-import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261008-fixwrap";
+import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
 import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
 import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
 import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261005-premium2";
