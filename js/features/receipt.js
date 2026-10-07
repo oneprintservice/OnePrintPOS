@@ -80,7 +80,11 @@ const PRINT_CSS = `
     border:1px solid #eee;
     padding:8px;
   }
-  .client-data label { font-weight:bold; white-space:nowrap; }
+  .client-data label {
+    font-weight:bold;
+    white-space:nowrap;
+  }
+  .client-data label::after { content: ":"; }
   .display-data {
     border-bottom:1px dotted #ccc;
     min-height:15px;
@@ -138,16 +142,23 @@ const PRINT_CSS = `
     font-size:8px;
   }
   .note-box ol { margin:0; padding-left:12px; }
-  .signature-wrapper { display:flex; gap:20px; font-size:10px; align-items:flex-end; }
+  .signature-wrapper {
+    display:flex;
+    gap:20px;
+    font-size:10px;
+    align-items:flex-end;
+  }
   .signature-box {
     text-align:center;
     width:3.5cm;
     display:flex;
     flex-direction:column;
-    justify-content:flex-end;
+  }
+  .signature-role {
+    min-height:12px;
   }
   .signature-name {
-    height:30px;
+    height:28px;
     display:flex;
     align-items:flex-end;
     justify-content:center;
@@ -155,17 +166,17 @@ const PRINT_CSS = `
     font-weight:bold;
     line-height:1.15;
     overflow:hidden;
+    overflow-wrap:anywhere;
+    word-break:normal;
   }
   .signature-line {
     display:block;
     margin-top:4px;
     border-bottom:1px solid #000;
-    font-weight:bold;
     min-height:15px;
-    text-transform:uppercase;
   }
   .total-row td {
-    font-size:12px !important;
+    font-size:11.5px !important;
     font-weight:800 !important;
   }
   .print-complaint {
@@ -199,7 +210,10 @@ function ensurePrintContainer() {
 
 export function buildReceipt(data, tipe = "nota") {
   const noNota = data.nomor || "-";
-  const nama = data.pelanggan || "-";
+  const nama = String(data.pelanggan || "-")
+    .trim()
+    .replace(/^\\((.*)\\)$/, "$1")
+    .trim() || "-";
   const telp = data.telp || "-";
   const merk = data.merk || "-";
   const kelengkapan = data.kelengkapan || "-";
@@ -233,12 +247,12 @@ export function buildReceipt(data, tipe = "nota") {
 
   const clientGrid = `
     <div class="client-data">
-      <label>Pelanggan:</label><span class="display-data">${esc(nama)}</span>
-      <label>Tanggal:</label><span class="display-data">${esc(tgl)}</span>
-      <label>Telepon:</label><span class="display-data">${esc(telp)}</span>
-      <label>Merk/Tipe:</label><span class="display-data">${esc(merk)}</span>
-      <label>Serial No.:</label><span class="display-data">${esc(sn)}</span>
-      <label>Kelengkapan:</label><span class="display-data">${esc(kelengkapan)}</span>
+      <label>Pelanggan</label><span class="display-data">${esc(nama)}</span>
+      <label>Tanggal</label><span class="display-data">${esc(tgl)}</span>
+      <label>Telepon</label><span class="display-data">${esc(telp)}</span>
+      <label>Merk/Tipe</label><span class="display-data">${esc(merk)}</span>
+      <label>Serial No.</label><span class="display-data">${esc(sn)}</span>
+      <label>Kelengkapan</label><span class="display-data">${esc(kelengkapan)}</span>
     </div>`;
 
   let mainContent = "";
@@ -289,7 +303,7 @@ atau scan QR di samping.
     noteContent = `<div class="note-box"><span class="note-title">SYARAT PENGAMBILAN:</span><ol><li>WAJIB bawa tanda terima ini saat pengambilan.</li><li>Barang tidak diambil &gt;2 bulan setelah konfirmasi bukan tanggung jawab kami.</li></ol></div>`;
   }
 
-  return `<div class="invoice-page">${kopHeader}${clientGrid}${mainContent}<div class="footer-area">${noteContent}<div class="signature-wrapper"><div class="signature-box"><span>Hormat Kami,</span><span class="signature-name">${esc(teknisi)}</span><span class="signature-line"></span></div><div class="signature-box"><span>Pelanggan,</span><span class="signature-name">${esc(nama)}</span><span class="signature-line"></span></div></div></div></div>`;
+  return `<div class="invoice-page">${kopHeader}${clientGrid}${mainContent}<div class="footer-area">${noteContent}<div class="signature-wrapper"><div class="signature-box"><span class="signature-role">Hormat Kami,</span><span class="signature-name">${esc(teknisi)}</span><span class="signature-line"></span></div><div class="signature-box"><span class="signature-role">Pelanggan,</span><span class="signature-name">${esc(nama)}</span><span class="signature-line"></span></div></div></div></div>`;
 }
 
 export function printReceipt(data, tipe = "nota") {
