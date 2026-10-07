@@ -198,7 +198,7 @@ export function buildReceipt(data, tipe = "nota") {
   const kopHeader = `
     <div class="header">
       <div class="header-left">
-        <img src="${logoPath}" class="logo-image" onerror="this.src='assets/logos.png'">
+        <img src="${logoPath}" class="logo-image" onerror="this.onerror=null;this.src='assets/logos.png'">
         <div class="company-info">
           <div class="company-name">OnePrint Service</div>
           <p class="tagline italic">Melayani Perbaikan Printer, Laptop, dan Komputer</p>
@@ -283,14 +283,18 @@ export function printReceipt(data, tipe = "nota") {
   const container = ensurePrintContainer();
   container.innerHTML = buildReceipt(data, tipe);
 
-  const qr = container.querySelector("#qr-print");
-  if (qr && window.QRCode) {
-    qr.innerHTML = "";
-    new window.QRCode(qr, {
-      text: `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(data.nomor || "")}`,
-      width: 110,
-      height: 110
-    });
+  try {
+    const qr = container.querySelector("#qr-print");
+    if (qr && window.QRCode) {
+      qr.innerHTML = "";
+      new window.QRCode(qr, {
+        text: `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(data.nomor || "")}`,
+        width: 110,
+        height: 110
+      });
+    }
+  } catch (err) {
+    console.error("QR gagal dibuat:", err);
   }
 
   // Jangan mengosongkan print-container pada "afterprint".
@@ -320,9 +324,19 @@ export function printReceipt(data, tipe = "nota") {
     ));
   };
 
-  waitForPrintReady().then(() => {
-    setTimeout(() => window.print(), 120);
-  });
+  const maxWait = new Promise(resolve => setTimeout(resolve, 2500));
+  Promise.race([waitForPrintReady(), maxWait])
+    .catch(err => console.error("Persiapan cetak bermasalah:", err))
+    .then(() => {
+      setTimeout(() => {
+        try {
+          window.print();
+        } catch (err) {
+          console.error("window.print gagal:", err);
+          alert("Dialog cetak gagal dibuka: " + (err && err.message ? err.message : err));
+        }
+      }, 120);
+    });
 }
 
 
