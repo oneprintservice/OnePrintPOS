@@ -19,34 +19,79 @@ export async function listRestocks(limit = 50) {
   return Number.isFinite(limit) ? sorted.slice(0, limit) : sorted;
 }
 
-export async function createRestock({ item, kategori, qty, hargaBeli, supplier, tanggal, catatan }) {
-  const amount = Math.max(0, Number(qty) || 0);
+export async function createRestock({
+  item,
+  kategori,
+  qty,
+  hargaBeli,
+  supplier,
+  tanggal,
+  catatan,
+  isiKemasan
+}) {
+  const packages = Math.max(0, Number(qty) || 0);
   const unitCost = Math.max(0, Number(hargaBeli) || 0);
-  if (!item?.key || !kategori || amount <= 0) throw new Error("Data restock tidak lengkap");
+  if (!item?.key || !kategori || packages <= 0) throw new Error("Data restock tidak lengkap");
 
+  const baseUnit = String(item.satuan || "pcs").toLowerCase();
+  const liquid = baseUnit === "ml" || baseUnit === "gram";
+  const packSize = liquid
+    ? Math.max(1, Number(isiKemasan) || Number(item.isi_kemasan_beli) || 1000)
+    : 1;
+
+  const stockAdded = packages * packSize;
   const stockSnap = await db.ref(`inventori/${kategori}/${item.key}/stok`).once("value");
   const current = Number(stockSnap.val() || 0);
-  const next = current + amount;
-  // Gunakan key unik Firebase, bukan Date.now(), agar dua input restock
-  // yang dibuat sangat berdekatan tidak saling menimpa.
+  const next = current + stockAdded;
+
   const id = db.ref("restock").push().key;
   if (!id) throw new Error("Gagal membuat ID restock");
-  const date = tanggal ? new Date(`${tanggal}T12:00:00`).toISOString() : new Date().toISOString();
-  const total = amount * unitCost;
+  const date = tanggal
+    ? new Date(`${tanggal}T12:00:00`).toISOString()
+    : (() => {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0).toISOString();
+    })();
+  const total = packages * unitCost;
 
   const restock = {
-    tanggal: date, itemKey: item.key, nama: item.nama || "", kategori,
-    qty: amount, satuan: item.satuan || "pcs", harga_beli: unitCost,
-    total, supplier: supplier || "", catatan: catatan || ""
+    tanggal: date,
+    itemKey: item.key,
+    nama: item.nama || "",
+    kategori,
+    qty: stockAdded,
+    qty_kemasan: packages,
+    isi_kemasan: packSize,
+    satuan: baseUnit,
+    satuan_kemasan: liquid ? `${packSize} ${baseUnit}/kemasan` : baseUnit,
+    harga_beli: unitCost,
+    harga_beli_per_dasar: liquid ? unitCost / packSize : unitCost,
+    total,
+    supplier: supplier || "",
+    catatan: catatan || ""
   };
+
   const updates = {};
   updates[`restock/${id}`] = restock;
   updates[`inventori/${kategori}/${item.key}/stok`] = next;
   if (total > 0) {
     updates[`keuangan/${id}`] = {
-      tanggal: date, tipe: "PENGELUARAN", kategori: "RESTOCK",
-      sumber: "RESTOCK", referensi: id, keterangan: `Restock ${item.nama || item.key}`,
-      jumlah: total, supplier: supplier || "", itemKey: item.key, nama: item.nama || "", kategori_item: kategori, qty: amount, satuan: item.satuan || "pcs", harga_beli: unitCost
+      tanggal: date,
+      tipe: "PENGELUARAN",
+      kategori: "RESTOCK",
+      sumber: "RESTOCK",
+      referensi: id,
+      keterangan: `Restock ${item.nama || item.key}`,
+      jumlah: total,
+      supplier: supplier || "",
+      itemKey: item.key,
+      nama: item.nama || "",
+      kategori_item: kategori,
+      qty: stockAdded,
+      qty_kemasan: packages,
+      isi_kemasan: packSize,
+      satuan: baseUnit,
+      harga_beli: unitCost
     };
   }
   await db.ref().update(updates);

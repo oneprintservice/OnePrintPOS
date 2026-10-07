@@ -86,6 +86,17 @@ const PRINT_CSS = `
     min-height:15px;
     text-transform:uppercase;
     padding-left:2px;
+    display:grid;
+    grid-template-columns:7px minmax(0,1fr);
+    column-gap:1px;
+    align-items:start;
+  }
+  .display-colon {
+    width:7px;
+    display:block;
+  }
+  .display-value {
+    min-width:0;
   }
   .service-table {
     width:100%;
@@ -210,12 +221,12 @@ export function buildReceipt(data, tipe = "nota") {
 
   const clientGrid = `
     <div class="client-data">
-      <label>Pelanggan</label><span class="display-data">: ${esc(nama)}</span>
-      <label>Tanggal</label><span class="display-data">: ${esc(tgl)}</span>
-      <label>Telepon</label><span class="display-data">: ${esc(telp)}</span>
-      <label>Merk/Tipe</label><span class="display-data">: ${esc(merk)}</span>
-      <label>Serial No.</label><span class="display-data">: ${esc(sn)}</span>
-      <label>Kelengkapan</label><span class="display-data">: ${esc(kelengkapan)}</span>
+      <label>Pelanggan</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(nama)}</span></span>
+      <label>Tanggal</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(tgl)}</span></span>
+      <label>Telepon</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(telp)}</span></span>
+      <label>Merk/Tipe</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(merk)}</span></span>
+      <label>Serial No.</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(sn)}</span></span>
+      <label>Kelengkapan</label><span class="display-data"><span class="display-colon">:</span><span class="display-value">${esc(kelengkapan)}</span></span>
     </div>`;
 
   let mainContent = "";
@@ -249,7 +260,7 @@ export function buildReceipt(data, tipe = "nota") {
       });
     });
     mainContent = `<table class="service-table"><thead><tr><th width="5%">No</th><th width="60%">Rincian</th><th width="10%">Qty</th><th width="25%">Subtotal</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="font-bold"><td colspan="3" style="text-align:right">TOTAL :</td><td style="text-align:right;background:#eee;">Rp ${moneyRaw(total)}</td></tr></tfoot></table>`;
-    noteContent = `<div class="note-box"><span class="note-title">PERHATIAN:</span><ol><li>1. Simpan nota / invoice sebagai bukti garansi.</li><li>2. Garansi tidak berlaku jika segel rusak atau cacat fisik karena pemakaian.</li></ol></div>`;
+    noteContent = `<div class="note-box"><span class="note-title">PERHATIAN:</span><ol><li>Simpan nota / invoice sebagai bukti garansi.</li><li>Garansi tidak berlaku jika segel rusak atau cacat fisik karena pemakaian.</li></ol></div>`;
   } else {
     mainContent = `<div class="print-complaint"><div style="font-weight:bold;border-bottom:1px solid #ccc;margin-bottom:8px;">KELUHAN PERANGKAT:</div><div class="uppercase">${esc(keluhan).replaceAll("\\n","<br>")}</div>
 <hr style="margin:10px 0">
@@ -266,7 +277,7 @@ atau scan QR di samping.
     noteContent = `<div class="note-box"><span class="note-title">SYARAT PENGAMBILAN:</span><ol><li>WAJIB bawa tanda terima ini saat pengambilan.</li><li>Barang tidak diambil &gt;2 bulan setelah konfirmasi bukan tanggung jawab kami.</li></ol></div>`;
   }
 
-  return `<div class="invoice-page">${kopHeader}${clientGrid}${mainContent}<div class="footer-area">${noteContent}<div class="signature-wrapper"><div class="signature-box"><span>Hormat Kami,</span><span class="signature-line">${esc(teknisi)}</span></div><div class="signature-box"><span>Pelanggan,</span><span class="signature-line">(${esc(nama)})</span></div></div></div></div>`;
+  return `<div class="invoice-page">${kopHeader}${clientGrid}${mainContent}<div class="footer-area">${noteContent}<div class="signature-wrapper"><div class="signature-box"><span>Hormat Kami,</span><span class="signature-line">${esc(teknisi)}</span></div><div class="signature-box"><span>Pelanggan,</span><span class="signature-line">${esc(nama)}</span></div></div></div></div>`;
 }
 
 export function printReceipt(data, tipe = "nota") {
@@ -319,4 +330,12 @@ export function printReceipt(data, tipe = "nota") {
   waitForPrintReady().then(() => {
     setTimeout(() => window.print(), 120);
   });
+}
+
+
+export async function printReceiptSmart(data, tipe = "nota") {
+  // Nota dan tanda terima tetap dokumen A5 untuk LaserJet.
+  // Jangan diarahkan ke thermal hanya karena Bridge label sedang aktif.
+  // Jalur thermal disediakan terpisah melalui printThermal() untuk label.
+  return printReceipt(data, tipe);
 }

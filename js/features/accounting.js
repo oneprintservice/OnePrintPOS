@@ -52,7 +52,7 @@ export function formatLedgerDate(value) {
   return d ? d.toLocaleDateString("id-ID") : "-";
 }
 
-export async function listLedger(limit = 300) {
+export async function listLedger(limit = 5000) {
   const snap = await db.ref("keuangan").once("value");
   if (!snap.exists()) return [];
 

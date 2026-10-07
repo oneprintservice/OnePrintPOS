@@ -38,8 +38,9 @@ function referenceDate(service) {
 }
 
 function cutoffDate(now = new Date()) {
-  // Three calendar months ago, preserving the current day where possible.
-  return new Date(now.getFullYear(), now.getMonth() - 3, now.getDate(), 23, 59, 59, 999);
+  // Keep the current month and the previous full calendar month.
+  // Cleanup candidates are terminal services before the first day of last month.
+  return new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
 }
 
 export function findCleanupCandidates(services, now = new Date()) {
@@ -67,14 +68,15 @@ export async function getCleanupCandidates() {
 export async function exportCleanupBackup(candidates) {
   const payload = {
     exportedAt: new Date().toISOString(),
-    rule: "DIAMBIL/CANCEL lebih dari 3 bulan",
+    rule: "DIAMBIL/CANCEL di luar 2 bulan kalender",
     count: candidates.length,
     services: candidates.map(({ _cleanupDate, ...service }) => service)
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  const stamp = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   a.href = url;
   a.download = `oneprint-backup-servis-lama-${stamp}.json`;
   document.body.appendChild(a);

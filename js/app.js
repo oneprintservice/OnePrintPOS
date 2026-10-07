@@ -6,14 +6,24 @@ import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
-import { printReceipt } from "./features/receipt.js?v=20261003-fix8";
-import { getPrinter, savePrinter, getPrinterHistory } from "./features/printers.js";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261003-fix8";
+import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
+import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
+import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261005-premium2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
 const $ = s => document.querySelector(s);
 const money = n => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
+
+// Business dates follow the browser's local calendar (WIB for the shop),
+// while event timestamps remain ISO/UTC. Never derive a business date/month
+// from toISOString(), because UTC can still be the previous calendar day.
+const localDateInput = (date = new Date()) => {
+  const d = date instanceof Date ? date : new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const localMonthInput = (date = new Date()) => localDateInput(date).slice(0, 7);
 let uiBound = false;
 let scanner = null;
 let idleCleanup = null;
@@ -65,7 +75,7 @@ const view = {
 const statusOf = x => String(x?.status || "").trim().toUpperCase();
 const dateInput = value => {
   const d = ledgerDate(value) || new Date();
-  return d.toISOString().slice(0, 10);
+  return localDateInput(d);
 };
 
 function currentForm() {
@@ -74,6 +84,7 @@ function currentForm() {
     telp: $("#input-telp").value.trim(),
     merk: $("#input-merk").value.trim(),
     serial: $("#barcode-input").value.trim(),
+    unitId: state.printerBarcode || $("#barcode-input").value.trim(),
     printerId: state.printerBarcode || $("#barcode-input").value.trim(),
     kelengkapan: $("#input-kelengkapan").value.trim(),
     keluhan: $("#input-keluhan").value.trim(),
@@ -116,7 +127,7 @@ function renderCart() {
 }
 
 async function loadAll() {
-  const tasks = await Promise.allSettled([listInventory(), listServices(), listRestocks(), listLedger()]);
+  const tasks = await Promise.allSettled([listInventory(), listServices(), listRestocks(), listLedger(Number.POSITIVE_INFINITY)]);
   state.inventory = tasks[0].status === "fulfilled" ? tasks[0].value : [];
   state.services = tasks[1].status === "fulfilled" ? tasks[1].value : [];
   // Preserve already-visible history if a Firebase read temporarily fails.
@@ -166,8 +177,8 @@ function renderInventory() {
   const rows = state.inventory.filter(x => String(x.nama || "").toLowerCase().includes(q));
   $("#inventory-count").textContent = `${rows.length} item`;
   $("#inventory-list").innerHTML = rows.map(x => `<tr>
-    <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.kategori)} · ${escapeHtml(x.satuan || "pcs")}</small></td>
-    <td>${money(x.harga_jual)}</td><td>${x.stok ?? 0}</td><td>${money(x.harga_beli)}</td>
+    <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.kategori)} · stok ${escapeHtml(x.satuan || "pcs")} · jual ${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td>
+    <td>${money(x.harga_jual)}<small>${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td><td>${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "pcs")}</td><td>${money(x.harga_beli)}<small>/ kemasan</small></td>
     <td><span class="stock ${Number(x.stok || 0) <= Number(x.minimum || 1) ? "low" : ""}">${Number(x.stok || 0) <= Number(x.minimum || 1) ? "Menipis" : "Aman"}</span></td>
     <td><button class="table-action" data-edit-inv="${x.kategori}:${x.key}">Edit</button><button class="table-action danger" data-del-inv="${x.kategori}:${x.key}">Hapus</button></td>
   </tr>`).join("") || `<tr><td colspan="6" class="empty">Belum ada inventori.</td></tr>`;
@@ -178,7 +189,7 @@ function renderSuggestions() {
   const box = $("#suggestions");
   if (q.length < 2) { box.hidden = true; return; }
   const rows = state.inventory.filter(x => String(x.nama || "").toLowerCase().includes(q)).slice(0, 10);
-  box.innerHTML = rows.map(x => `<button class="suggestion" data-pick="${x.kategori}:${x.key}"><b>${escapeHtml(x.nama)}</b><span>${money(x.harga_jual)} · stok ${x.stok ?? 0} ${escapeHtml(x.satuan || "")}</span></button>`).join("");
+  box.innerHTML = rows.map(x => `<button class="suggestion" data-pick="${x.kategori}:${x.key}"><b>${escapeHtml(x.nama)}</b><span>${money(x.harga_jual)} / ${escapeHtml(x.satuan_jual || x.satuan || "pcs")} · stok ${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "")}</span></button>`).join("");
   box.hidden = !rows.length;
 }
 
@@ -187,7 +198,7 @@ function renderServiceTable() {
   const selectedStatus = $("#service-status-filter")?.value || "";
   const rows = filterOperationalServices(state.services).filter(x =>
     (!selectedStatus || statusOf(x) === selectedStatus) &&
-    [x.nomor, x.pelanggan, x.telp, x.merk, x.serial, x.status].some(v => String(v || "").toLowerCase().includes(q))
+    [x.nomor, x.unitId, x.printerId, x.pelanggan, x.telp, x.merk, x.serial, x.status].some(v => String(v || "").toLowerCase().includes(q))
   ).slice(0, 120);
 
   const serviceCount = $("#service-count");
@@ -268,7 +279,7 @@ function renderRestock() {
   $("#restock-list").innerHTML = rows.map((x, index) => `<tr data-restock-row="${escapeHtml(x.key)}">
     <td>${new Date(x.tanggal || 0).toLocaleDateString("id-ID")}</td>
     <td><strong>${escapeHtml(x.nama || x.itemKey || "-")}</strong><small>${escapeHtml(x.supplier || "-")}</small></td>
-    <td><strong>${Number(x.qty || 0).toLocaleString("id-ID")}</strong> ${escapeHtml(x.satuan || "")}</td>
+    <td><strong>${Number(x.qty_kemasan ?? x.qty ?? 0).toLocaleString("id-ID")}</strong> ${x.qty_kemasan != null ? "kemasan" : escapeHtml(x.satuan || "")}<small>${x.qty_kemasan != null ? `${Number(x.qty || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "")} masuk stok` : "riwayat lama"}</small></td>
     <td>${money(x.total)}</td>
     <td class="restock-action-cell">${
       index === 0
@@ -303,7 +314,7 @@ function renderMaintenance(services = state.services) {
     <td><span class="status status-${statusOf(x).toLowerCase()}">${escapeHtml(statusOf(x))}</span></td>
     <td>${formatCleanupDate(x._cleanupDate)}</td>
     <td>${money(x.total)}</td>
-  </tr>`).join("") || `<tr><td colspan="5" class="empty">Tidak ada servis DIAMBIL/CANCEL yang lebih dari 3 bulan.</td></tr>`;
+  </tr>`).join("") || `<tr><td colspan="5" class="empty">Tidak ada data lama.</td></tr>`;
 
   const cleanBtn = $("#maintenance-clean");
   const exportBtn = $("#maintenance-export");
@@ -321,7 +332,261 @@ function accountingDateForService(service) {
 }
 
 function selectedAccountingMonth() {
-  return $("#accounting-month")?.value || new Date().toISOString().slice(0, 7);
+  return $("#accounting-month")?.value || localMonthInput();
+}
+
+
+function monthIndex(value) {
+  const m = String(value || "").match(/^(\d{4})-(\d{2})$/);
+  if (!m) return NaN;
+  return Number(m[1]) * 12 + Number(m[2]) - 1;
+}
+
+function monthFromIndex(index) {
+  const year = Math.floor(index / 12);
+  const month = (index % 12) + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function monthLabel(value) {
+  const m = String(value || "").match(/^(\d{4})-(\d{2})$/);
+  if (!m) return value || "-";
+  return new Date(Number(m[1]), Number(m[2]) - 1, 1, 12).toLocaleDateString("id-ID", {
+    month: "short",
+    year: "numeric"
+  });
+}
+
+function defaultAccountingRange() {
+  const end = monthIndex(localMonthInput());
+  return {
+    start: monthFromIndex(end - 12),
+    end: monthFromIndex(end)
+  };
+}
+
+function accountingRangeValues() {
+  const defaults = defaultAccountingRange();
+  return {
+    start: $("#accounting-range-start")?.value || defaults.start,
+    end: $("#accounting-range-end")?.value || defaults.end
+  };
+}
+
+function collectAccountingRange(start, end) {
+  const startIndex = monthIndex(start);
+  const endIndex = monthIndex(end);
+  if (!Number.isFinite(startIndex) || !Number.isFinite(endIndex)) {
+    throw new Error("Rentang bulan belum lengkap.");
+  }
+  if (startIndex > endIndex) {
+    throw new Error("Bulan mulai tidak boleh setelah bulan akhir.");
+  }
+  if (endIndex - startIndex > 12) {
+    throw new Error("Rentang maksimal 12 bulan.");
+  }
+
+  const months = [];
+  for (let i = startIndex; i <= endIndex; i++) {
+    months.push(monthFromIndex(i));
+  }
+
+  const rows = months.map(month => ({ month, income: 0, expense: 0, net: 0, transactions: 0 }));
+  const byMonth = new Map(rows.map(row => [row.month, row]));
+
+  // Manual + restock expenses/income are taken from the finance ledger.
+  state.ledger.forEach(item => {
+    const month = ledgerMonth(item.tanggal);
+    const bucket = byMonth.get(month);
+    if (!bucket || String(item.sumber || "").toUpperCase() === "SERVIS") return;
+    const amount = Math.max(0, Number(item.jumlah) || 0);
+    if (String(item.tipe || "").toUpperCase() === "PEMASUKAN") bucket.income += amount;
+    if (String(item.tipe || "").toUpperCase() === "PENGELUARAN") bucket.expense += amount;
+    if (amount > 0) bucket.transactions += 1;
+  });
+
+  // Service income is derived from DIAMBIL so the payment date remains authoritative.
+  state.services.forEach(service => {
+    if (statusOf(service) !== "DIAMBIL") return;
+    const month = accountingMonthForService(service);
+    const bucket = byMonth.get(month);
+    if (!bucket) return;
+    const amount = Math.max(0, Number(service.total) || 0);
+    bucket.income += amount;
+    if (amount > 0) bucket.transactions += 1;
+  });
+
+  rows.forEach(row => { row.net = row.income - row.expense; });
+  return rows;
+}
+
+function renderAccountingChart() {
+  const chart = $("#accounting-chart");
+  const summary = $("#accounting-chart-summary");
+  const detail = $("#accounting-chart-detail");
+  const error = $("#accounting-range-error");
+  if (!chart || !summary) return;
+
+  const { start, end } = accountingRangeValues();
+  const startEl = $("#accounting-range-start");
+  const endEl = $("#accounting-range-end");
+  if (startEl) startEl.value = start;
+  if (endEl) endEl.value = end;
+
+  try {
+    const rows = collectAccountingRange(start, end);
+    if (error) { error.hidden = true; error.textContent = ""; }
+
+    const totalIncome = rows.reduce((sum, row) => sum + row.income, 0);
+    const totalExpense = rows.reduce((sum, row) => sum + row.expense, 0);
+    const totalNet = totalIncome - totalExpense;
+    const avgIncome = rows.length ? totalIncome / rows.length : 0;
+    const activeMonths = rows.filter(row => row.income || row.expense).length;
+    const best = rows.reduce((bestRow, row) => row.income > bestRow.income ? row : bestRow, rows[0]);
+
+    summary.innerHTML = `
+      <div class="accounting-summary-card">
+        <span>Total pendapatan</span>
+        <strong>${money(totalIncome)}</strong>
+        <small>${activeMonths} bulan aktif</small>
+      </div>
+      <div class="accounting-summary-card">
+        <span>Total pengeluaran</span>
+        <strong>${money(totalExpense)}</strong>
+        <small>Restock + manual</small>
+      </div>
+      <div class="accounting-summary-card">
+        <span>Laba bersih</span>
+        <strong class="${totalNet < 0 ? "negative" : ""}">${money(totalNet)}</strong>
+        <small>Pendapatan - pengeluaran</small>
+      </div>
+      <div class="accounting-summary-card">
+        <span>Rata-rata pendapatan</span>
+        <strong>${money(avgIncome)}</strong>
+        <small>Per bulan dalam rentang</small>
+      </div>
+    `;
+
+    if (!rows.some(row => row.income || row.expense)) {
+      chart.innerHTML = `<div class="accounting-chart-empty">Belum ada transaksi pada rentang ${escapeHtml(monthLabel(start))} – ${escapeHtml(monthLabel(end))}.</div>`;
+      if (detail) detail.innerHTML = "";
+      return;
+    }
+
+    const width = Math.max(820, rows.length * 78);
+    const height = 340;
+    const pad = { top: 28, right: 28, bottom: 62, left: 76 };
+    const innerW = width - pad.left - pad.right;
+    const innerH = height - pad.top - pad.bottom;
+    const values = rows.flatMap(row => [row.income, row.expense, row.net, 0]);
+    const minValue = Math.min(0, ...values);
+    const maxValue = Math.max(1, ...values);
+    const valueSpan = Math.max(1, maxValue - minValue);
+    const y = value => pad.top + ((maxValue - value) / valueSpan) * innerH;
+    const zeroY = y(0);
+    const stepX = rows.length > 1 ? innerW / (rows.length - 1) : innerW / 2;
+    const x = index => rows.length === 1 ? pad.left + innerW / 2 : pad.left + index * stepX;
+
+    const fmtShort = value => {
+      const n = Number(value || 0);
+      const sign = n < 0 ? "-" : "";
+      const abs = Math.abs(n);
+      if (abs >= 1000000) return `${sign}Rp ${(abs / 1000000).toFixed(1).replace(".", ",")}jt`;
+      if (abs >= 1000) return `${sign}Rp ${(abs / 1000).toFixed(0)}rb`;
+      return `${sign}Rp ${abs.toLocaleString("id-ID")}`;
+    };
+
+    const series = [
+      { key: "income", label: "Pendapatan", stroke: "#2563eb" },
+      { key: "expense", label: "Pengeluaran", stroke: "#ef4444" },
+      { key: "net", label: "Laba bersih", stroke: "#16a34a" }
+    ];
+
+    const pointsFor = key => rows.map((row, index) => `${x(index).toFixed(1)},${y(row[key]).toFixed(1)}`).join(" ");
+
+    let svg = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Grafik tren pendapatan, pengeluaran, dan laba bersih">
+      <rect x="0" y="0" width="${width}" height="${height}" rx="14" fill="#ffffff"/>`;
+
+    const tickCount = 4;
+    for (let i = 0; i <= tickCount; i++) {
+      const value = maxValue - (valueSpan * i / tickCount);
+      const yy = y(value);
+      const isZero = Math.abs(value) < valueSpan / 100;
+      svg += `<line x1="${pad.left}" y1="${yy.toFixed(1)}" x2="${width - pad.right}" y2="${yy.toFixed(1)}" stroke="${isZero ? "#cbd5e1" : "#edf1f6"}" stroke-width="${isZero ? "1.5" : "1"}"/>`;
+      svg += `<text x="${pad.left - 12}" y="${(yy + 4).toFixed(1)}" text-anchor="end" font-size="10" fill="#7b8798">${escapeHtml(fmtShort(value))}</text>`;
+    }
+
+    rows.forEach((row, index) => {
+      const xx = x(index);
+      svg += `<line x1="${xx.toFixed(1)}" y1="${pad.top}" x2="${xx.toFixed(1)}" y2="${height - pad.bottom}" stroke="#f5f7fa" stroke-width="1"/>`;
+      svg += `<text x="${xx.toFixed(1)}" y="${height - 26}" text-anchor="middle" font-size="10" fill="#667085">${escapeHtml(monthLabel(row.month))}</text>`;
+    });
+
+    if (minValue < 0) {
+      svg += `<line x1="${pad.left}" y1="${zeroY.toFixed(1)}" x2="${width - pad.right}" y2="${zeroY.toFixed(1)}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+    }
+
+    series.forEach(item => {
+      svg += `<polyline points="${pointsFor(item.key)}" fill="none" stroke="${item.stroke}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+      rows.forEach((row, index) => {
+        const xx = x(index);
+        const yy = y(row[item.key]);
+        const label = `${item.label} — ${monthLabel(row.month)}: ${money(row[item.key])}`;
+        svg += `<circle cx="${xx.toFixed(1)}" cy="${yy.toFixed(1)}" r="4.5" fill="#fff" stroke="${item.stroke}" stroke-width="2.5"><title>${escapeHtml(label)}</title></circle>`;
+      });
+    });
+
+    svg += `</svg>`;
+
+    chart.innerHTML = `
+      <div class="accounting-chart-toolbar">
+        <div class="accounting-legend">
+          ${series.map(item => `<span><i style="background:${item.stroke}"></i>${item.label}</span>`).join("")}
+        </div>
+        <span class="accounting-chart-note">Hover titik untuk melihat nilai bulan tersebut</span>
+      </div>
+      ${svg}
+    `;
+
+    if (detail) {
+      detail.innerHTML = `
+        <div class="accounting-detail-head">
+          <div>
+            <span class="eyebrow">RINCIAN PER BULAN</span>
+            <h3>Ringkasan periode</h3>
+          </div>
+          <span class="accounting-detail-meta">${rows.length} bulan · ${activeMonths} bulan bertransaksi</span>
+        </div>
+        <div class="table-wrap">
+          <table class="accounting-detail-table">
+            <thead>
+              <tr><th>Bulan</th><th>Pendapatan</th><th>Pengeluaran</th><th>Laba Bersih</th><th>Transaksi</th></tr>
+            </thead>
+            <tbody>
+              ${rows.map(row => `
+                <tr>
+                  <td><strong>${escapeHtml(monthLabel(row.month))}</strong></td>
+                  <td class="money-in">${money(row.income)}</td>
+                  <td class="money-out">${money(row.expense)}</td>
+                  <td class="${row.net < 0 ? "money-negative" : "money-net"}">${money(row.net)}</td>
+                  <td>${Number(row.transactions || 0).toLocaleString("id-ID")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="accounting-detail-foot">Bulan tanpa transaksi tetap ditampilkan sebagai Rp0. Pendapatan servis hanya dihitung saat status DIAMBIL.</div>
+      `;
+    }
+  } catch (err) {
+    if (error) {
+      error.hidden = false;
+      error.textContent = err.message || "Rentang tidak valid.";
+    }
+    summary.innerHTML = "";
+    chart.innerHTML = "";
+    if (detail) detail.innerHTML = "";
+  }
 }
 
 function renderAccounting() {
@@ -386,6 +651,9 @@ function renderAccounting() {
 
   const cancelBtn = $("#cancel-manual-ledger");
   if (cancelBtn) cancelBtn.hidden = !state.editLedgerKey;
+
+  const chartPanel = $("#accounting-analysis");
+  if (chartPanel && !chartPanel.hidden) renderAccountingChart();
 }
 
 function resetManualLedgerForm() {
@@ -398,7 +666,7 @@ function resetManualLedgerForm() {
 
   if (type) type.value = "PEMASUKAN";
   if (category) category.value = "OPERASIONAL";
-  if (date) date.value = new Date().toISOString().slice(0, 10);
+  if (date) date.value = localDateInput();
   if (amount) amount.value = "";
   if (note) note.value = "";
 
@@ -456,7 +724,13 @@ async function addCartItem() {
     const inv = state.inventory.find(x => x.key === state.selectedInventory.key && x.kategori === state.selectedInventory.kategori);
     if (inv) {
       item.key = inv.key; item.kategori = inv.kategori; item.dariInventori = true;
-      if (inv.kategori !== "jasa" && Number(inv.stok || 0) <= 0) return view.toast("Stok barang habis", "error");
+      if (inv.kategori !== "jasa") {
+        const unit = String(inv.satuan || "").toLowerCase();
+        const stockPerQty = (unit === "ml" || unit === "gram") ? Math.max(1, Number(inv.isi_jual) || 100) : 1;
+        if (Number(inv.stok || 0) < qty * stockPerQty) {
+          return view.toast(`Stok tidak cukup. Tersedia ${Number(inv.stok || 0).toLocaleString("id-ID")} ${inv.satuan || "unit"}.`, "error");
+        }
+      }
     }
   }
   state.items[state.tab].push(item);
@@ -526,7 +800,7 @@ function renderPrinterContext(printer, history = [], barcode = "") {
     el.hidden = false;
     el.innerHTML = `
       <div class="printer-context-head">
-        <span class="printer-found printer-new">＋ PRINTER BARU</span>
+        <span class="printer-found printer-new">＋ UNIT BARU</span>
         <strong>Identitas belum terdaftar</strong>
       </div>
       <div class="printer-context-grid">
@@ -534,45 +808,46 @@ function renderPrinterContext(printer, history = [], barcode = "") {
         <span>Status</span><b>Siap didaftarkan</b>
       </div>
       <small class="printer-history-empty">
-        Barcode ini akan disimpan sebagai identitas printer saat transaksi servis disimpan.
+        Kode ini akan disimpan sebagai identitas unit saat transaksi servis disimpan.
       </small>
     `;
     return;
   }
 
-  const recent = history.slice(0, 3).map(item =>
+  const recent = history.slice(0, 5).map(item =>
     `<li><strong>${escapeHtml(item.nomor || "-")}</strong> · ${escapeHtml(item.status || "-")} · ${escapeHtml(item.tanggal ? new Date(item.tanggal).toLocaleDateString("id-ID") : "-")}</li>`
   ).join("");
 
   el.hidden = false;
   el.innerHTML = `
     <div class="printer-context-head">
-      <span class="printer-found">✓ PRINTER DITEMUKAN</span>
+      <span class="printer-found">✓ UNIT DITEMUKAN</span>
       <strong>${escapeHtml(printer.merk || "Printer")}</strong>
     </div>
     <div class="printer-context-grid">
-      <span>ID Barcode</span><b>${escapeHtml(printer.barcode || "-")}</b>
+      <span>ID Unit</span><b>${escapeHtml(printer.unitId || printer.barcode || "-")}</b>
       <span>Serial</span><b>${escapeHtml(printer.serial || "-")}</b>
       <span>Pemilik</span><b>${escapeHtml(printer.pelanggan || "-")}</b>
       <span>Riwayat</span><b>${history.length} servis</b>
     </div>
-    ${history.length ? `<div class="printer-history"><small>Riwayat terakhir</small><ol>${recent}</ol></div>` : `<small class="printer-history-empty">Belum ada riwayat servis untuk printer ini.</small>`}
+    ${history.length ? `<div class="printer-history"><small>Riwayat servis terbaru</small><ol>${recent}</ol></div>` : `<small class="printer-history-empty">Belum ada riwayat servis untuk unit ini.</small>`}
   `;
 }
 
 async function loadPrinterIdentity(code, { notify = true } = {}) {
-  const barcode = String(code || "").trim();
-  if (!barcode) return null;
+  const unitId = String(code || "").trim();
+  if (!unitId) return null;
 
-  let printer = await getPrinter(barcode);
+  let unit = await getUnit(unitId);
 
-  if (!printer) {
-    // Compatibility with the old pelanggan/{serial} records.
-    const legacy = await findCustomer(barcode);
+  if (!unit) {
+    // Compatibility with old pelanggan/{serial} records.
+    const legacy = await findCustomer(unitId);
     if (legacy) {
-      printer = {
-        barcode,
-        serial: barcode,
+      unit = {
+        unitId,
+        barcode: unitId,
+        serial: unitId,
         nama: legacy.nama,
         pelanggan: legacy.nama,
         telp: legacy.telp,
@@ -582,34 +857,29 @@ async function loadPrinterIdentity(code, { notify = true } = {}) {
     }
   }
 
-  if (!printer) {
-    state.printerBarcode = barcode;
+  if (!unit) {
+    state.printerBarcode = unitId;
     state.selectedPrinter = null;
-
-    // Barcode hasil scan adalah IDENTITAS printer.
-    // Tampilkan kembali ke field agar operator dapat melihat dan
-    // memastikan kode yang akan disimpan sebelum transaksi disimpan.
     const input = $("#barcode-input");
-    if (input) input.value = barcode;
-
-    renderPrinterContext(null, [], barcode);
-    if (notify) view.toast(`Printer ${barcode} baru. Barcode siap disimpan sebagai identitas printer.`, "info");
+    if (input) input.value = unitId;
+    renderPrinterContext(null, [], unitId);
+    if (notify) view.toast(`Unit ${unitId} baru. Identitas siap didaftarkan.`, "info");
     return null;
   }
 
-  const history = await getPrinterHistory(barcode);
-  state.printerBarcode = barcode;
-  state.selectedPrinter = printer;
+  const history = await getUnitHistory(unitId);
+  state.printerBarcode = unitId;
+  state.selectedPrinter = unit;
 
-  $("#barcode-input").value = printer.serial || barcode;
-  $("#input-nama").value = printer.pelanggan || printer.nama || "";
-  $("#input-telp").value = printer.telp || "";
-  $("#input-merk").value = printer.merk || "";
-  $("#input-kelengkapan").value = printer.kelengkapan || "";
+  $("#barcode-input").value = unit.serial || unitId;
+  $("#input-nama").value = unit.pelanggan || unit.nama || "";
+  $("#input-telp").value = unit.telp || "";
+  $("#input-merk").value = unit.merk || "";
+  $("#input-kelengkapan").value = unit.kelengkapan || "";
 
-  renderPrinterContext(printer, history);
-  if (notify) view.toast(`Printer ${barcode} dikenali. Data pelanggan dimuat.`, "success");
-  return printer;
+  renderPrinterContext(unit, history);
+  if (notify) view.toast(`Unit ${unitId} dikenali. ${history.length} riwayat servis ditemukan.`, "success");
+  return unit;
 }
 
 async function saveCurrentService(print = false, type = "nota") {
@@ -630,6 +900,7 @@ async function saveCurrentService(print = false, type = "nota") {
     sparepart: state.items.sparepart,
     total: total(),
     teknisi: state.user?.email?.split("@")[0]?.toUpperCase() || "TEKNISI",
+    unitId: state.printerBarcode || f.serial || "",
     printerId: state.printerBarcode || f.serial || ""
   };
 
@@ -642,9 +913,9 @@ async function saveCurrentService(print = false, type = "nota") {
     data.diambilAt = old.diambilAt;
   }
 
-  if (data.printerId) {
-    await savePrinter({
-      barcode: data.printerId,
+  if (data.unitId) {
+    await saveUnit({
+      unitId: data.unitId,
       serial: data.serial,
       merk: data.merk,
       pelanggan: data.pelanggan,
@@ -662,7 +933,7 @@ async function saveCurrentService(print = false, type = "nota") {
 
   const changedStatus = statusOf(old) && statusOf(old) !== statusOf(data);
   view.toast(changedStatus ? `Status berubah: ${statusOf(old)} → ${statusOf(data)}` : "Perubahan servis berhasil disimpan", "success");
-  if (print) printReceipt(data, type);
+  if (print) await printReceiptSmart(data, type);
 }
 
 async function openService(key) {
@@ -804,6 +1075,193 @@ function setMenu(open) {
   document.body.classList.toggle("menu-lock", open);
 }
 
+
+function isLiquidInventoryUnit(unit) {
+  const u = String(unit || "").toLowerCase();
+  return u === "ml" || u === "gram";
+}
+
+function updateInventoryUnitUI() {
+  const category = String($("#inv-kategori")?.value || "").toLowerCase();
+  const unit = $("#inv-satuan")?.value || "pcs";
+  const liquidCategory = category === "tinta" || category === "cairan";
+  const liquid = liquidCategory || isLiquidInventoryUnit(unit);
+  const packSize = $("#inv-pack-size");
+  const sellSize = $("#inv-sell-size");
+  const sellUnit = $("#inv-sell-unit");
+  const note = $("#inventory-unit-note");
+  const packLabel = $("#inv-pack-size-label");
+  const sellSizeLabel = $("#inv-sell-size-label");
+  const sellUnitLabel = $("#inv-sell-unit-label");
+  const beliLabel = document.querySelector('label[for="inv-beli"]');
+  if (!packSize || !sellSize || !sellUnit) return;
+
+  // Tinta dan cairan selalu dikelola sebagai volume dasar.
+  if (liquidCategory && !isLiquidInventoryUnit(unit)) {
+    $("#inv-satuan").value = "ml";
+  }
+
+  const baseUnit = $("#inv-satuan").value || unit;
+  const isLiquid = liquidCategory || isLiquidInventoryUnit(baseUnit);
+
+  if (isLiquid) {
+    if (!Number(packSize.value) || Number(packSize.value) === 1) packSize.value = 1000;
+    if (!Number(sellSize.value) || Number(sellSize.value) === 1) sellSize.value = 100;
+
+    if (!sellUnit.value || /^(pcs|ml|gram|unit)$/i.test(sellUnit.value)) {
+      sellUnit.value = `${sellSize.value}${baseUnit}`;
+    }
+
+    if (packLabel) packLabel.childNodes[0].nodeValue = "Isi 1 kemasan beli (ml)";
+    if (sellSizeLabel) sellSizeLabel.childNodes[0].nodeValue = "Isi per penjualan (ml)";
+    if (sellUnitLabel) sellUnitLabel.childNodes[0].nodeValue = "Nama unit jual";
+    if (beliLabel) beliLabel.childNodes[0].nodeValue = "Harga beli / kemasan";
+    const stockLabel = document.querySelector('label[for="inv-stok"]') || $("#inv-stok")?.closest("label");
+    if (stockLabel) stockLabel.childNodes[0].nodeValue = "Stok dasar (ml)";
+    const jualLabel = document.querySelector('label[for="inv-jual"]') || $("#inv-jual")?.closest("label");
+    if (jualLabel) jualLabel.childNodes[0].nodeValue = `Harga jual / ${sellSize.value || 100}ml`;
+
+    note.textContent =
+      `Stok disimpan dalam ml. Setiap qty transaksi menjual ${sellSize.value || 100} ml dan mengurangi stok sebesar itu, walaupun cairan yang dituangkan secara fisik kurang dari ${sellSize.value || 100} ml.`;
+  } else {
+    packSize.value = 1;
+    sellSize.value = 1;
+    sellUnit.value = baseUnit;
+    if (packLabel) packLabel.childNodes[0].nodeValue = "Isi 1 kemasan beli";
+    if (sellSizeLabel) sellSizeLabel.childNodes[0].nodeValue = "Isi per penjualan";
+    if (sellUnitLabel) sellUnitLabel.childNodes[0].nodeValue = "Nama unit jual";
+    if (beliLabel) beliLabel.childNodes[0].nodeValue = "Harga beli / kemasan";
+    const stockLabel = $("#inv-stok")?.closest("label");
+    if (stockLabel) stockLabel.childNodes[0].nodeValue = "Stok dasar";
+    const jualLabel = $("#inv-jual")?.closest("label");
+    if (jualLabel) jualLabel.childNodes[0].nodeValue = "Harga jual / unit jual";
+
+    note.textContent =
+      "Barang biasa memakai stok dan harga per unit. Untuk tinta, head cleaner, thinner, atau alkohol IPA, gunakan kategori tinta/cairan dan satuan ml.";
+  }
+}
+
+function renderRestockCalculation() {
+  const box = $("#restock-calculation");
+  const select = $("#restock-item");
+  if (!box || !select) return;
+  const [kategori, key] = select.value.split("|");
+  const inv = state.inventory.find(x => x.kategori === kategori && x.key === key);
+  if (!inv) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+
+  const packages = Math.max(0, Number($("#restock-qty").value) || 0);
+  const packSize = Math.max(1, Number($("#restock-pack-size").value) || Number(inv.isi_kemasan_beli) || 1);
+  const price = Math.max(0, Number($("#restock-price").value) || Number(inv.harga_beli) || 0);
+  const liquid = isLiquidInventoryUnit(inv.satuan);
+  const added = packages * packSize;
+  const perBase = liquid ? price / packSize : price;
+
+  box.hidden = false;
+  box.innerHTML = `
+    <div><span>Akan masuk stok</span><strong>${added.toLocaleString("id-ID")} ${escapeHtml(inv.satuan || "pcs")}</strong></div>
+    <div><span>Total pembelian</span><strong>${money(packages * price)}</strong></div>
+    <div><span>HPP / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(perBase)}</strong></div>
+    ${liquid ? `<small>Contoh: ${packages || 1} kemasan × ${packSize.toLocaleString("id-ID")} ${escapeHtml(inv.satuan)}. Harga jual dihitung terpisah per unit jual.</small>` : ""}
+  `;
+}
+
+function getPrinterFormConfig() {
+  return {
+    mode: $("#printer-mode")?.value || "browser",
+    bridgeUrl: $("#printer-bridge-url")?.value.trim() || "http://127.0.0.1:18181",
+    document: {
+      transport: $("#printer-document-transport")?.value || "cups",
+      printerName: $("#printer-document-name")?.value.trim() || "",
+      paper: $("#printer-document-paper")?.value || "A5"
+    },
+    thermal: {
+      transport: $("#printer-transport")?.value || "cups",
+      printerName: $("#printer-name")?.value.trim() || "",
+      host: $("#printer-host")?.value.trim() || "",
+      port: Number($("#printer-port")?.value || 9100),
+      serialPath: $("#printer-serial")?.value.trim() || "",
+      baudRate: Number($("#printer-baud")?.value || 9600),
+      paper: $("#printer-paper")?.value || "58"
+    },
+    token: $("#printer-token")?.value || ""
+  };
+}
+
+function fillPrinterFormConfig(config = {}) {
+  const thermal = config.thermal || {};
+  const document = config.document || {};
+  const legacy = !config.thermal && !config.document ? config : {};
+  const values = {
+    "printer-mode": config.mode || "browser",
+    "printer-bridge-url": config.bridgeUrl || "http://127.0.0.1:18181",
+    "printer-document-transport": document.transport || "cups",
+    "printer-document-name": document.printerName || "",
+    "printer-document-paper": document.paper || "A5",
+    "printer-transport": thermal.transport || legacy.transport || "cups",
+    "printer-name": thermal.printerName || legacy.printerName || "",
+    "printer-host": thermal.host || legacy.host || "",
+    "printer-port": thermal.port || legacy.port || 9100,
+    "printer-serial": thermal.serialPath || legacy.serialPath || "",
+    "printer-baud": thermal.baudRate || legacy.baudRate || 9600,
+    "printer-paper": thermal.paper || legacy.paper || "58",
+    "printer-token": config.token || ""
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const el = $(`#${id}`);
+    if (el) el.value = value;
+  });
+  updatePrinterTransportUI();
+}
+
+function updatePrinterTransportUI() {
+  const transport = $("#printer-transport")?.value || "cups";
+  const cups = transport === "cups";
+  const win = transport === "winspool";
+  const net = transport === "network";
+  const serial = transport === "serial";
+  const nameLabel = $("#printer-name-label");
+  const nameInput = $("#printer-name");
+
+  $("#printer-name-wrap")?.toggleAttribute("hidden", !(win || cups));
+  $("#printer-host-wrap")?.toggleAttribute("hidden", !net);
+  $("#printer-port-wrap")?.toggleAttribute("hidden", !net);
+  $("#printer-serial-wrap")?.toggleAttribute("hidden", !serial);
+  $("#printer-baud-wrap")?.toggleAttribute("hidden", !serial);
+
+  if (nameLabel) {
+    nameLabel.textContent = cups
+      ? "Nama antrian CUPS"
+      : win
+        ? "Nama printer Windows"
+        : "Nama printer";
+  }
+  if (nameInput) nameInput.placeholder = cups ? "Thermal_Label" : "POS-80C";
+}
+
+async function refreshPrinterBridgeStatus() {
+  const badge = $("#printer-bridge-status");
+  if (!badge) return;
+  try {
+    const cfg = getPrinterFormConfig();
+    if (cfg.mode !== "bridge") {
+      badge.textContent = "Mode browser";
+      badge.classList.remove("bridge-ok");
+      return;
+    }
+    const result = await testPrinterBridge(cfg);
+    badge.textContent = result.ok ? "Bridge siap" : "Bridge gagal";
+    badge.classList.toggle("bridge-ok", !!result.ok);
+  } catch (err) {
+    badge.textContent = "Bridge gagal";
+    badge.classList.remove("bridge-ok");
+    console.warn("OnePrint printer bridge:", err);
+  }
+}
+
 function bind() {
   if (uiBound) return;
   uiBound = true;
@@ -904,6 +1362,11 @@ function bind() {
         $("#inv-nama").value = x.nama; $("#inv-kategori").value = cat;
         $("#inv-beli").value = x.harga_beli || 0; $("#inv-jual").value = x.harga_jual || 0;
         $("#inv-stok").value = x.stok || 0; $("#inv-satuan").value = x.satuan || "pcs";
+        $("#inv-pack-size").value = x.isi_kemasan_beli || ((x.satuan || "").toLowerCase() === "ml" ? 1000 : 1);
+        $("#inv-sell-size").value = x.isi_jual || ((x.satuan || "").toLowerCase() === "ml" ? 100 : 1);
+        $("#inv-sell-unit").value = x.satuan_jual || (((x.satuan || "").toLowerCase() === "ml") ? `${x.isi_jual || 100}ml` : (x.satuan || "pcs"));
+        updateInventoryUnitUI();
+
         switchPage("inventory");
       }
       return;
@@ -932,7 +1395,7 @@ function bind() {
         renderMaintenance(latest);
         renderStats();
         renderServiceTable();
-        view.toast(`Pemeriksaan selesai. ${state.maintenanceCandidates.length} kandidat ditemukan.`, "success");
+        view.toast(`Pemeriksaan selesai. ${state.maintenanceCandidates.length} kandidat.`, "success");
       } catch (err) {
         console.error("OnePrint maintenance refresh:", err);
         view.toast(`Gagal memeriksa data: ${err?.message || "koneksi Firebase bermasalah."}`, "error");
@@ -946,7 +1409,7 @@ function bind() {
       try {
         await exportCleanupBackup(candidates);
         state.maintenanceBackupExported = true;
-        view.toast(`Backup ${candidates.length} servis berhasil dibuat.`, "success");
+        view.toast(`Backup ${candidates.length} data berhasil dibuat.`, "success");
       } catch (err) {
         console.error("OnePrint maintenance export:", err);
         view.toast("Backup gagal dibuat.", "error");
@@ -959,20 +1422,20 @@ function bind() {
       if (!candidates.length) return view.toast("Tidak ada kandidat yang bisa dibersihkan.", "info");
 
       const confirmed = confirm(
-        `Hapus permanen ${candidates.length} servis DIAMBIL/CANCEL yang lebih dari 3 bulan?\\n\\n` +
+        `Hapus permanen ${candidates.length} data lama?\\n\\n` +
         `Servis yang masih aktif, SELESAI, atau belum selesai tidak akan disentuh.\\n` +
         `Data yang dihapus tidak dapat dipulihkan. Sebaiknya export backup terlebih dahulu.`
       );
       if (!confirmed) return;
 
-      const second = confirm(`Konfirmasi terakhir: hapus ${candidates.length} data servis lama sekarang?`);
+      const second = confirm(`Konfirmasi terakhir: hapus ${candidates.length} data lama sekarang?`);
       if (!second) return;
 
       try {
         const removed = await cleanupCandidates(candidates);
         state.maintenanceBackupExported = false;
         await loadAll();
-        view.toast(`${removed} data servis lama berhasil dibersihkan.`, "success");
+        view.toast(`${removed} data lama berhasil dibersihkan.`, "success");
       } catch (err) {
         console.error("OnePrint maintenance cleanup:", err);
         await loadAll();
@@ -1108,14 +1571,14 @@ function bind() {
     if (!state.editServiceKey) return view.toast("Buka servis tersimpan terlebih dahulu", "error");
     const data = await getService(state.editServiceKey);
     if (!data) return view.toast("Data servis tidak ditemukan", "error");
-    printReceipt(data, "tanda-terima");
+    await printReceiptSmart(data, "tanda-terima");
   });
 
   $("#reprint-invoice").addEventListener("click", async () => {
     if (!state.editServiceKey) return view.toast("Buka servis tersimpan terlebih dahulu", "error");
     const data = await getService(state.editServiceKey);
     if (!data) return view.toast("Data servis tidak ditemukan", "error");
-    printReceipt(data, "nota");
+    await printReceiptSmart(data, "nota");
   });
 
   $("#delete-service").addEventListener("click", removeCurrentService);
@@ -1135,6 +1598,34 @@ function bind() {
   }
   $("#accounting-month").addEventListener("change", renderAccounting);
 
+  $("#toggle-accounting-chart")?.addEventListener("click", () => {
+    const panel = $("#accounting-analysis");
+    if (!panel) return;
+    const willOpen = panel.hidden;
+    panel.hidden = !willOpen;
+    const button = $("#toggle-accounting-chart");
+    if (button) button.textContent = willOpen ? "▥ Sembunyikan Grafik" : "▥ Lihat Grafik";
+    if (willOpen) {
+      const defaults = defaultAccountingRange();
+      const start = $("#accounting-range-start");
+      const end = $("#accounting-range-end");
+      if (start && !start.value) start.value = defaults.start;
+      if (end && !end.value) end.value = defaults.end;
+      renderAccountingChart();
+    }
+  });
+
+  $("#close-accounting-chart")?.addEventListener("click", () => {
+    const panel = $("#accounting-analysis");
+    if (panel) panel.hidden = true;
+    const button = $("#toggle-accounting-chart");
+    if (button) button.textContent = "▥ Lihat Grafik";
+  });
+
+  $("#apply-accounting-range")?.addEventListener("click", renderAccountingChart);
+  $("#accounting-range-start")?.addEventListener("change", renderAccountingChart);
+  $("#accounting-range-end")?.addEventListener("change", renderAccountingChart);
+
   $("#find-service-code").addEventListener("click", async () => {
     const code = $("#service-code-input").value.trim();
     const d = await findServiceByCode(code);
@@ -1147,25 +1638,89 @@ function bind() {
     const item = {
       nama: $("#inv-nama").value, kategori: $("#inv-kategori").value,
       harga_beli: $("#inv-beli").value, harga_jual: $("#inv-jual").value,
-      stok: $("#inv-stok").value, satuan: $("#inv-satuan").value
+      stok: $("#inv-stok").value, satuan: $("#inv-satuan").value,
+      isi_kemasan_beli: $("#inv-pack-size").value,
+      isi_jual: $("#inv-sell-size").value,
+      satuan_jual: $("#inv-sell-unit").value.trim()
     };
     if (!item.nama.trim()) return view.toast("Nama barang wajib diisi", "error");
     await saveInventory(item, state.editInventoryKey, state.editInventoryCategory);
     state.editInventoryKey = null; state.editInventoryCategory = null;
-    ["inv-nama","inv-beli","inv-jual","inv-stok"].forEach(id => $(`#${id}`).value = "");
+    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = "");
     await loadAll(); view.toast("Inventori berhasil disimpan", "success");
   });
 
   $("#clear-inventory").addEventListener("click", () => {
     state.editInventoryKey = null; state.editInventoryCategory = null;
     ["inv-nama","inv-beli","inv-jual","inv-stok"].forEach(id => $(`#${id}`).value = "");
+    $("#inv-kategori").value = "sparepart";
+    $("#inv-satuan").value = "pcs";
+    $("#inv-pack-size").value = "1";
+    $("#inv-sell-size").value = "1";
+    $("#inv-sell-unit").value = "pcs";
+    updateInventoryUnitUI();
   });
+  $("#inv-kategori").addEventListener("change", () => {
+    const category = String($("#inv-kategori").value || "").toLowerCase();
+    const liquidCategory = category === "tinta" || category === "cairan";
+    const unit = $("#inv-satuan");
+    if (liquidCategory && unit && !isLiquidInventoryUnit(unit.value)) {
+      unit.value = "ml";
+    }
+    updateInventoryUnitUI();
+  });
+  $("#inv-satuan").addEventListener("change", updateInventoryUnitUI);
+  $("#inv-sell-size").addEventListener("input", updateInventoryUnitUI);
+
+  $("#restock-qty").addEventListener("input", renderRestockCalculation);
+  $("#restock-pack-size").addEventListener("input", renderRestockCalculation);
+  $("#restock-price").addEventListener("input", renderRestockCalculation);
+
+  $("#printer-transport")?.addEventListener("change", updatePrinterTransportUI);
+  $("#printer-mode")?.addEventListener("change", refreshPrinterBridgeStatus);
+  $("#printer-document-transport")?.addEventListener("change", () => {});
+
+  $("#printer-save")?.addEventListener("click", () => {
+    savePrinterConfig(getPrinterFormConfig());
+    view.toast("Setting printer disimpan", "success");
+    refreshPrinterBridgeStatus();
+  });
+  $("#printer-test")?.addEventListener("click", async () => {
+    try {
+      const cfg = getPrinterFormConfig();
+      savePrinterConfig(cfg);
+      const result = await testPrinterBridge(cfg);
+      view.toast(result.ok ? "Bridge printer terhubung" : "Bridge printer tidak merespons", result.ok ? "success" : "error");
+      $("#printer-bridge-status").textContent = result.ok ? "Bridge siap" : "Bridge gagal";
+    } catch (err) {
+      view.toast(err.message || "Tes printer gagal", "error");
+    }
+  });
+  $("#printer-test-print")?.addEventListener("click", async () => {
+    try {
+      const cfg = getPrinterFormConfig();
+      savePrinterConfig(cfg);
+      await printTestReceipt(cfg);
+      view.toast("Perintah cetak tes terkirim", "success");
+    } catch (err) {
+      view.toast(err.message || "Cetak tes gagal", "error");
+    }
+  });
+
+  fillPrinterFormConfig(getPrinterConfig());
+  updateInventoryUnitUI();
+  renderRestockCalculation();
+
 
   $("#restock-search").addEventListener("input", renderRestock);
   $("#restock-item").addEventListener("change", () => {
     const [kategori, key] = $("#restock-item").value.split("|");
     const inv = state.inventory.find(x => x.kategori === kategori && x.key === key);
-    if (inv) $("#restock-price").value = Number(inv.harga_beli || 0);
+    if (inv) {
+      $("#restock-price").value = Number(inv.harga_beli || 0);
+      $("#restock-pack-size").value = Number(inv.isi_kemasan_beli || ((inv.satuan || "").toLowerCase() === "ml" ? 1000 : 1));
+      renderRestockCalculation();
+    }
   });
 
   $("#save-restock").addEventListener("click", async () => {
@@ -1174,9 +1729,10 @@ function bind() {
     const result = await createRestock({
       item: inv, kategori: inv.kategori, qty: $("#restock-qty").value,
       hargaBeli: $("#restock-price").value, supplier: $("#restock-supplier").value.trim(),
-      tanggal: $("#restock-date").value, catatan: $("#restock-note").value.trim()
+      tanggal: $("#restock-date").value, catatan: $("#restock-note").value.trim(),
+      isiKemasan: $("#restock-pack-size").value
     });
-    $("#restock-qty").value = ""; $("#restock-price").value = ""; $("#restock-supplier").value = ""; $("#restock-note").value = "";
+    $("#restock-qty").value = ""; $("#restock-price").value = ""; $("#restock-pack-size").value = "1"; $("#restock-supplier").value = ""; $("#restock-note").value = "";
     // The multi-path Firebase write has succeeded. Show its result immediately,
     // even if the subsequent history read is delayed or temporarily unavailable.
     state.restocks = [result, ...state.restocks.filter(x => x.key !== result.key)]
@@ -1215,10 +1771,11 @@ watchAuth({
       window.location.href = "login.html";
     });
     bind();
+    renderPage("dashboard");
     resetServiceForm();
-    $("#accounting-month").value ||= new Date().toISOString().slice(0, 7);
-    $("#restock-date").value ||= new Date().toISOString().slice(0, 10);
-    $("#ledger-date").value ||= new Date().toISOString().slice(0, 10);
+    $("#accounting-month").value ||= localMonthInput();
+    $("#restock-date").value ||= localDateInput();
+    $("#ledger-date").value ||= localDateInput();
     await loadAll();
   },
   onSignedOut: () => {
