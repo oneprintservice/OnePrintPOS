@@ -73,26 +73,19 @@ const PRINT_CSS = `
   }
   .client-data {
     display:grid;
-    grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);
+    grid-template-columns:auto 1fr auto 1fr;
     gap:5px 8px;
     font-size:10px;
     margin-bottom:15px;
     border:1px solid #eee;
     padding:8px;
   }
-  .client-data label {
-    font-weight:bold;
-    white-space:nowrap;
-  }
-  .client-data label::after { content: ":"; }
+  .client-data label { font-weight:bold; white-space:nowrap; }
   .display-data {
     border-bottom:1px dotted #ccc;
     min-height:15px;
-    min-width:0;
     text-transform:uppercase;
-    padding-left:0;
-    overflow-wrap:anywhere;
-    word-break:normal;
+    padding-left:2px;
   }
   .service-table {
     width:100%;
@@ -142,42 +135,15 @@ const PRINT_CSS = `
     font-size:8px;
   }
   .note-box ol { margin:0; padding-left:12px; }
-  .signature-wrapper {
-    display:flex;
-    gap:20px;
-    font-size:10px;
-    align-items:flex-end;
-  }
-  .signature-box {
-    text-align:center;
-    width:3.5cm;
-    display:flex;
-    flex-direction:column;
-  }
-  .signature-role {
-    min-height:12px;
-  }
-  .signature-name {
-    height:28px;
-    display:flex;
-    align-items:flex-end;
-    justify-content:center;
-    text-transform:uppercase;
-    font-weight:bold;
-    line-height:1.15;
-    overflow:hidden;
-    overflow-wrap:anywhere;
-    word-break:normal;
-  }
+  .signature-wrapper { display:flex; gap:20px; font-size:10px; }
+  .signature-box { text-align:center; width:3.5cm; }
   .signature-line {
     display:block;
-    margin-top:4px;
+    margin-top:35px;
     border-bottom:1px solid #000;
+    font-weight:bold;
     min-height:15px;
-  }
-  .total-row td {
-    font-size:11.5px !important;
-    font-weight:800 !important;
+    text-transform:uppercase;
   }
   .print-complaint {
     border:1px solid #000;
@@ -210,10 +176,7 @@ function ensurePrintContainer() {
 
 export function buildReceipt(data, tipe = "nota") {
   const noNota = data.nomor || "-";
-  const nama = String(data.pelanggan || "-")
-    .trim()
-    .replace(/^\\((.*)\\)$/, "$1")
-    .trim() || "-";
+  const nama = data.pelanggan || "-";
   const telp = data.telp || "-";
   const merk = data.merk || "-";
   const kelengkapan = data.kelengkapan || "-";
@@ -247,12 +210,12 @@ export function buildReceipt(data, tipe = "nota") {
 
   const clientGrid = `
     <div class="client-data">
-      <label>Pelanggan</label><span class="display-data">${esc(nama)}</span>
-      <label>Tanggal</label><span class="display-data">${esc(tgl)}</span>
-      <label>Telepon</label><span class="display-data">${esc(telp)}</span>
-      <label>Merk/Tipe</label><span class="display-data">${esc(merk)}</span>
-      <label>Serial No.</label><span class="display-data">${esc(sn)}</span>
-      <label>Kelengkapan</label><span class="display-data">${esc(kelengkapan)}</span>
+      <label>Pelanggan</label><span class="display-data">: ${esc(nama)}</span>
+      <label>Tanggal</label><span class="display-data">: ${esc(tgl)}</span>
+      <label>Telepon</label><span class="display-data">: ${esc(telp)}</span>
+      <label>Merk/Tipe</label><span class="display-data">: ${esc(merk)}</span>
+      <label>Serial No.</label><span class="display-data">: ${esc(sn)}</span>
+      <label>Kelengkapan</label><span class="display-data">: ${esc(kelengkapan)}</span>
     </div>`;
 
   let mainContent = "";
@@ -285,7 +248,7 @@ export function buildReceipt(data, tipe = "nota") {
         rows += `<tr><td style="text-align:center">${i+1}</td><td class="uppercase">${esc(item.nama)}</td><td style="text-align:center">${item.qty}</td><td style="text-align:right">Rp ${moneyRaw(subtotal)}</td></tr>`;
       });
     });
-    mainContent = `<table class="service-table"><thead><tr><th width="5%">No</th><th width="60%">Rincian</th><th width="10%">Qty</th><th width="25%">Subtotal</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="total-row"><td colspan="3" style="text-align:right">TOTAL :</td><td style="text-align:right;background:#eee;">Rp ${moneyRaw(total)}</td></tr></tfoot></table>`;
+    mainContent = `<table class="service-table"><thead><tr><th width="5%">No</th><th width="60%">Rincian</th><th width="10%">Qty</th><th width="25%">Subtotal</th></tr></thead><tbody>${rows}</tbody><tfoot><tr class="font-bold"><td colspan="3" style="text-align:right">TOTAL :</td><td style="text-align:right;background:#eee;">Rp ${moneyRaw(total)}</td></tr></tfoot></table>`;
     noteContent = `<div class="note-box"><span class="note-title">PERHATIAN:</span><ol><li>Simpan nota / invoice sebagai bukti garansi.</li><li>Garansi tidak berlaku jika segel rusak atau cacat fisik karena pemakaian.</li></ol></div>`;
   } else {
     mainContent = `<div class="print-complaint"><div style="font-weight:bold;border-bottom:1px solid #ccc;margin-bottom:8px;">KELUHAN PERANGKAT:</div><div class="uppercase">${esc(keluhan).replaceAll("\\n","<br>")}</div>
@@ -303,7 +266,7 @@ atau scan QR di samping.
     noteContent = `<div class="note-box"><span class="note-title">SYARAT PENGAMBILAN:</span><ol><li>WAJIB bawa tanda terima ini saat pengambilan.</li><li>Barang tidak diambil &gt;2 bulan setelah konfirmasi bukan tanggung jawab kami.</li></ol></div>`;
   }
 
-  return `<div class="invoice-page">${kopHeader}${clientGrid}${mainContent}<div class="footer-area">${noteContent}<div class="signature-wrapper"><div class="signature-box"><span class="signature-role">Hormat Kami,</span><span class="signature-name">${esc(teknisi)}</span><span class="signature-line"></span></div><div class="signature-box"><span class="signature-role">Pelanggan,</span><span class="signature-name">${esc(nama)}</span><span class="signature-line"></span></div></div></div></div>`;
+  return `<div class="invoice-page">${kopHeader}${clientGrid}${mainContent}<div class="footer-area">${noteContent}<div class="signature-wrapper"><div class="signature-box"><span>Hormat Kami,</span><span class="signature-line">${esc(teknisi)}</span></div><div class="signature-box"><span>Pelanggan,</span><span class="signature-line">${esc(nama)}</span></div></div></div></div>`;
 }
 
 export function printReceipt(data, tipe = "nota") {
