@@ -82,11 +82,15 @@ const PRINT_CSS = `
   }
   .client-data label { font-weight:bold; white-space:nowrap; }
   .display-data {
+    display:flex;
+    align-items:flex-start;
     border-bottom:1px dotted #ccc;
     min-height:15px;
     text-transform:uppercase;
     padding-left:2px;
   }
+  .display-data .colon { flex:none; margin-right:4px; }
+  .display-data .val { flex:1; min-width:0; overflow-wrap:anywhere; }
   .service-table {
     width:100%;
     border-collapse:collapse;
@@ -210,12 +214,12 @@ export function buildReceipt(data, tipe = "nota") {
 
   const clientGrid = `
     <div class="client-data">
-      <label>Pelanggan</label><span class="display-data">: ${esc(nama)}</span>
-      <label>Tanggal</label><span class="display-data">: ${esc(tgl)}</span>
-      <label>Telepon</label><span class="display-data">: ${esc(telp)}</span>
-      <label>Merk/Tipe</label><span class="display-data">: ${esc(merk)}</span>
-      <label>Serial No.</label><span class="display-data">: ${esc(sn)}</span>
-      <label>Kelengkapan</label><span class="display-data">: ${esc(kelengkapan)}</span>
+      <label>Pelanggan</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(nama)}</span></span>
+      <label>Tanggal</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(tgl)}</span></span>
+      <label>Telepon</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(telp)}</span></span>
+      <label>Merk/Tipe</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(merk)}</span></span>
+      <label>Serial No.</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(sn)}</span></span>
+      <label>Kelengkapan</label><span class="display-data"><span class="colon">:</span><span class="val">${esc(kelengkapan)}</span></span>
     </div>`;
 
   let mainContent = "";
