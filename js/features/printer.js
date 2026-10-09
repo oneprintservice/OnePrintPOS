@@ -101,6 +101,7 @@ async function bridgeFetch(path, options = {}, config = getPrinterConfig()) {
 
 function targetFromThermal(config) {
   const thermal = config.thermal || DEFAULT_CONFIG.thermal;
+  if (thermal.transport === "cleanter") return { type: "cleanter" };
   if (thermal.transport === "network") {
     if (!thermal.host) throw new Error("IP printer label belum diisi");
     return { type: "network", host: thermal.host, port: Number(thermal.port || 9100) };
@@ -124,8 +125,26 @@ export async function testPrinterBridge(config = getPrinterConfig()) {
 
 export async function printThermal(data, tipe = "label", config = getPrinterConfig()) {
   if (config.mode !== "bridge") throw new Error("Mode printer thermal masih Browser");
-  const target = targetFromThermal(config);
   const thermal = config.thermal || DEFAULT_CONFIG.thermal;
+
+  // Cleanter berjalan langsung di Android dan menerima array content ESC/POS,
+  // bukan payload target serial milik OnePrint Printer Bridge untuk PC.
+  if (thermal.transport === "cleanter") {
+    const code = String(data?.nomor || data?.serial || data?.kode || "").trim();
+    if (!code) throw new Error("Kode QR kosong. Buat atau scan kode terlebih dahulu.");
+    const content = [
+      { type: "text", text: "ONEPRINT SERVICE", align: "center", bold: true },
+      { type: "text", text: code, align: "center", bold: true },
+      { type: "qr", data: code, size: 6, align: "center" },
+      { type: "feed", lines: 2 }
+    ];
+    return bridgeFetch("/print", {
+      method: "POST",
+      body: JSON.stringify({ content, cut: true })
+    }, { ...config, bridgeUrl: config.bridgeUrl || "http://localhost:9100" });
+  }
+
+  const target = targetFromThermal(config);
   return bridgeFetch("/print", {
     method: "POST",
     body: JSON.stringify({
@@ -138,8 +157,22 @@ export async function printThermal(data, tipe = "label", config = getPrinterConf
 }
 
 export async function printTestReceipt(config = getPrinterConfig()) {
-  const target = targetFromThermal(config);
   const thermal = config.thermal || DEFAULT_CONFIG.thermal;
+  if (thermal.transport === "cleanter") {
+    return bridgeFetch("/print", {
+      method: "POST",
+      body: JSON.stringify({
+        cut: true,
+        content: [
+          { type: "text", text: "ONEPRINT TEST", align: "center", bold: true },
+          { type: "text", text: "Cleanter Bluetooth OK", align: "center" },
+          { type: "qr", data: "ONEPRINT-TEST", size: 5, align: "center" },
+          { type: "feed", lines: 2 }
+        ]
+      })
+    }, { ...config, bridgeUrl: config.bridgeUrl || "http://localhost:9100" });
+  }
+  const target = targetFromThermal(config);
   return bridgeFetch("/print-test", {
     method: "POST",
     body: JSON.stringify({

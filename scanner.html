@@ -118,8 +118,8 @@
     <summary>Pengaturan printer thermal</summary>
     <div class="printer-form">
       <label>Mode<select id="printer-mode"><option value="browser">Browser</option><option value="bridge">Thermal Bridge</option></select></label>
-      <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS</option><option value="winspool">USB / Windows</option><option value="network">Wi-Fi / LAN</option><option value="serial">Bluetooth / COM</option></select></label>
-      <label class="span2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181"></label>
+      <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS</option><option value="winspool">USB / Windows</option><option value="network">Wi-Fi / LAN</option><option value="serial">Bluetooth / COM (PC)</option><option value="cleanter">Cleanter Bluetooth (Android)</option></select></label>
+      <label class="span2">Bridge URL<input id="printer-bridge-url" value="http://localhost:9100"></label>
       <label id="printer-name-wrap">Nama printer<input id="printer-name" placeholder="POS-80C"></label>
       <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
       <label id="printer-port-wrap" hidden>Port<input id="printer-port" type="number" value="9100"></label>
@@ -127,7 +127,7 @@
       <label id="printer-baud-wrap" hidden>Baud<input id="printer-baud" type="number" value="9600"></label>
       <label>Lebar<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
       <label>Token<input id="printer-token" type="password"></label>
-      <div class="span2 bridge-note">USB via driver, Wi-Fi via TCP 9100, Bluetooth via COM/serial.</div>
+      <div class="span2 bridge-note">Cleanter Android: gunakan http://localhost:9100 dan transport Cleanter Bluetooth. COM/serial hanya untuk bridge PC. Nota/invoice LaserJet tidak terpengaruh.</div>
       <button class="scanner-btn primary span2" onclick="savePrinterSettings()">Simpan & Tes</button>
     </div>
   </details>
@@ -175,8 +175,9 @@ function fillPrinter(){
   const c=getPrinterConfig();
   const t=c.thermal||{};
   $("printer-mode").value=c.mode;
-  $("printer-bridge-url").value=c.bridgeUrl;
-  $("printer-transport").value=t.transport||"cups";
+  const legacySerial = (t.transport === "serial" && !t.serialPath && /:(18181|9100)\/?$/i.test(c.bridgeUrl || ""));
+  $("printer-bridge-url").value=legacySerial ? "http://localhost:9100" : (c.bridgeUrl || "http://localhost:9100");
+  $("printer-transport").value=legacySerial ? "cleanter" : (t.transport||"cups");
   $("printer-name").value=t.printerName||"";
   $("printer-host").value=t.host||"";
   $("printer-port").value=t.port||9100;
@@ -242,9 +243,10 @@ window.savePrinterSettings=async function(){
   const cfg=savePrinterConfig(getConfigFromForm());
   if(cfg.mode!=="bridge") return alert("Setting disimpan. Mode Browser aktif.");
   try{
-    await testPrinterBridge(cfg);
+    const health = await testPrinterBridge(cfg);
+    if(cfg.thermal?.transport === "cleanter" && health.status !== "ok") throw new Error("Cleanter merespons, tetapi status health tidak OK.");
     await printTestReceipt(cfg);
-    alert("Bridge aktif. Cetak tes sudah dikirim.");
+    alert("Koneksi bridge berhasil. Cetak tes sudah dikirim.");
   }catch(e){ alert(e.message||"Bridge belum tersambung."); }
 };
 
