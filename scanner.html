@@ -243,25 +243,53 @@ window.generateQR=async function(){
   $("printUnit").innerHTML=`<span class="print-key">Merk/Tipe:</span> ${escapeLabelText(unit||"-")}`;
   return code;
 };
-window.printBrowser=async function(){
-  try{
-    await generateQR();
-    // Jalur browser tetap menggunakan dialog cetak Chrome; thermal bridge terpisah.
-    setTimeout(()=>window.print(),150);
-  }catch(e){ alert(e.message||"QR belum siap dicetak."); }
+let browserPrintBusy=false;
+let thermalPrintBusy=false;
+
+// Keep Browser printing synchronous inside the tap on Android Chrome.
+// It must never call Cleanter or wait for an async canvas operation first.
+window.printBrowser=function(){
+  if(browserPrintBusy) return;
+  const code=$("manualCode").value.trim();
+  if(!code){ alert("Masukkan atau buat serial/ID terlebih dahulu."); return; }
+  const customer=$("customer").value.trim();
+  const unit=$("unit").value.trim();
+  $("previewCode").textContent=code;
+  $("previewInfo").textContent=`${customer||"-"} · ${unit||"-"}`;
+  $("printCode").innerHTML=`<span class="print-key">Serial:</span> ${escapeLabelText(code)}`;
+  $("printCustomer").innerHTML=`<span class="print-key">Pelanggan:</span> ${escapeLabelText(customer||"-")}`;
+  $("printUnit").innerHTML=`<span class="print-key">Merk/Tipe:</span> ${escapeLabelText(unit||"-")}`;
+  browserPrintBusy=true;
+  try { window.print(); }
+  catch(e){ alert(e.message||"Cetak via Browser gagal."); }
+  finally { browserPrintBusy=false; }
 };
+
+// Bluetooth printing has its own in-flight state and never invokes window.print().
 window.printThermal=async function(){
+  if(thermalPrintBusy) return;
+  const btn=document.querySelector('[onclick="printThermal()"]');
+  const oldText=btn?.textContent;
+  thermalPrintBusy=true;
+  if(btn){btn.disabled=true;btn.textContent="Mengirim ke RPP02…";}
   try{
     await generateQR();
     const cfg=savePrinterConfig(getConfigFromForm());
     if(cfg.thermal?.transport!=="cleanter") throw new Error("Pilih transport Cleanter Bluetooth (Android) pada pengaturan printer thermal.");
     const code=$("manualCode").value.trim();
-    await printThermal({
+    const result=await printThermal({
       nomor:code, pelanggan:$("customer").value.trim(), merk:$("unit").value.trim(), serial:code
     },"label",{...cfg,mode:"bridge",bridgeUrl:cfg.bridgeUrl||"http://localhost:9100"});
-    alert("Label QR dikirim ke printer RPP02.");
+    if(result?.ok===false) throw new Error(result.message||"Cleanter menolak pekerjaan cetak.");
+    alert("Permintaan label dikirim ke Cleanter.");
   }catch(e){ alert(e.message||"Cetak QR Bluetooth gagal."); }
+  finally{thermalPrintBusy=false;if(btn){btn.disabled=false;btn.textContent=oldText||"Cetak QR Bluetooth (RPP02)";}}
 };
+
+// Refresh the label canvas before printing so Browser print needs no await.
+["manualCode","customer","unit"].forEach(id=>$(id).addEventListener("input",()=>{
+  if($("manualCode").value.trim()) generateQR().catch(()=>{});
+}));
 window.savePrinterSettings=async function(){
   const cfg=savePrinterConfig(getConfigFromForm());
   const btn=document.querySelector('[onclick="savePrinterSettings()"]');

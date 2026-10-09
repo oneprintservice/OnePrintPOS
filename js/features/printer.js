@@ -91,12 +91,23 @@ async function bridgeFetch(path, options = {}, config = getPrinterConfig()) {
   const fetchOptions = { ...options, headers, mode: "cors" };
   if (space) fetchOptions.targetAddressSpace = space;
 
-  const response = await fetch(url, fetchOptions);
-  const text = await response.text();
-  let body = {};
-  try { body = text ? JSON.parse(text) : {}; } catch { body = { message: text }; }
-  if (!response.ok) throw new Error(body.message || `Bridge HTTP ${response.status}`);
-  return body;
+  // Bound bridge waits so the UI cannot remain pending indefinitely.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  fetchOptions.signal = controller.signal;
+  try {
+    const response = await fetch(url, fetchOptions);
+    const text = await response.text();
+    let body = {};
+    try { body = text ? JSON.parse(text) : {}; } catch { body = { message: text }; }
+    if (!response.ok) throw new Error(body.message || `Bridge HTTP ${response.status}`);
+    return body;
+  } catch (error) {
+    if (error?.name === "AbortError") throw new Error("Cleanter tidak merespons dalam 15 detik. Pastikan server aktif dan coba lagi.");
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function targetFromThermal(config) {
