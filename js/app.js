@@ -152,6 +152,7 @@ async function loadAll() {
   console.info(`OnePrint: ${state.services.length} data servis, ${state.inventory.length} inventori`);
   renderInventory();
   renderStats();
+  renderDashboard();
   renderServiceTable();
   renderRestock();
   renderAccounting();
@@ -170,6 +171,128 @@ function renderStats() {
     badge.hidden = false;
     badge.dataset.empty = String(s.baru === 0);
   }
+}
+
+
+function renderDashboard() {
+  renderDashboardIncome();
+  renderDashboardOutOfStock();
+  renderDashboardSparepartSearch();
+}
+
+function renderDashboardIncome() {
+  const chart = $("#dashboard-income-chart");
+  const totalEl = $("#dashboard-income-total");
+  const periodEl = $("#dashboard-income-period");
+  if (!chart || !totalEl) return;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const days = new Date(year, month + 1, 0).getDate();
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const daily = Array.from({ length: days }, (_, i) => ({
+    day: i + 1,
+    date: `${monthKey}-${String(i + 1).padStart(2, "0")}`,
+    amount: 0
+  }));
+  const byDate = new Map(daily.map(row => [row.date, row]));
+
+  // Follow accounting rules: service income is recognized at DIAMBIL,
+  // while non-service ledger income uses its transaction date.
+  state.ledger.forEach(item => {
+    if (String(item.sumber || "").toUpperCase() === "SERVIS") return;
+    if (String(item.tipe || "").toUpperCase() !== "PEMASUKAN") return;
+    const date = ledgerDate(item.tanggal);
+    if (!date || localMonthInput(date) !== monthKey) return;
+    const bucket = byDate.get(localDateInput(date));
+    if (bucket) bucket.amount += Math.max(0, Number(item.jumlah) || 0);
+  });
+
+  state.services.forEach(service => {
+    if (statusOf(service) !== "DIAMBIL") return;
+    const date = accountingDateForService(service);
+    if (!date || localMonthInput(date) !== monthKey) return;
+    const bucket = byDate.get(localDateInput(date));
+    if (bucket) bucket.amount += Math.max(0, Number(service.total) || 0);
+  });
+
+  const total = daily.reduce((sum, row) => sum + row.amount, 0);
+  totalEl.textContent = money(total);
+  if (periodEl) periodEl.textContent = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+
+  const max = Math.max(1, ...daily.map(row => row.amount));
+  const width = 930, height = 210;
+  const pad = { top: 16, right: 8, bottom: 31, left: 8 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const slot = plotW / days;
+  const barW = Math.max(2, Math.min(18, slot * 0.66));
+  const bars = daily.map(row => {
+    const h = row.amount > 0 ? Math.max(2, (row.amount / max) * plotH) : 1;
+    const x = pad.left + (row.day - 1) * slot + (slot - barW) / 2;
+    const y = pad.top + plotH - h;
+    const labelX = pad.left + (row.day - 0.5) * slot;
+    return `<g><title>Tanggal ${row.day}: ${money(row.amount)}</title><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" class="dashboard-income-bar"${row.amount === 0 ? ' opacity=".22"' : ""}/><text x="${labelX.toFixed(2)}" y="${height - 9}" text-anchor="middle" class="dashboard-income-day">${row.day}</text></g>`;
+  }).join("");
+  chart.innerHTML = `<svg class="dashboard-income-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="Pendapatan dari tanggal 1 sampai ${days}">
+    <line x1="${pad.left}" y1="${pad.top + plotH}" x2="${width - pad.right}" y2="${pad.top + plotH}" class="dashboard-income-baseline"/>
+    ${bars}
+  </svg><div class="dashboard-chart-foot"><span>1</span><span>${days} ${now.toLocaleDateString("id-ID", { month: "short" })}</span></div>`;
+}
+
+function renderDashboardOutOfStock() {
+  const list = $("#dashboard-stock-list");
+  const empty = $("#dashboard-stock-empty");
+  const count = $("#dashboard-stock-count");
+  if (!list || !empty || !count) return;
+  const rows = state.inventory.filter(item => Number(item.stok || 0) === 0);
+  count.textContent = `${rows.length} barang`;
+  empty.hidden = rows.length > 0;
+  list.innerHTML = rows.map(item => `
+    <div class="dashboard-stock-item">
+      <span class="dashboard-stock-dot" aria-hidden="true"></span>
+      <span class="dashboard-stock-name"><strong>${escapeHtml(item.nama || "Tanpa nama")}</strong><small>${escapeHtml(item.kategori || "inventori")} · ${escapeHtml(item.satuan || "pcs")}</small></span>
+      <span class="dashboard-stock-zero">Habis</span>
+    </div>`).join("");
+}
+
+function renderDashboardSparepartSearch() {
+  const input = $("#dashboard-sparepart-search");
+  const results = $("#dashboard-sparepart-results");
+  const clear = $("#dashboard-sparepart-clear");
+  if (!input || !results) return;
+  const query = input.value.trim().toLowerCase();
+  if (clear) clear.hidden = !query;
+  if (!query) {
+    results.innerHTML = `<p class="dashboard-empty">Ketik nama sparepart untuk melihat harga.</p>`;
+    return;
+  }
+  const rows = state.inventory
+    .filter(item => String(item.kategori || "").toLowerCase() === "sparepart")
+    .filter(item => String(item.nama || "").toLowerCase().includes(query))
+    .slice(0, 12);
+  if (!rows.length) {
+    results.innerHTML = `<p class="dashboard-empty">Sparepart tidak ditemukan.</p>`;
+    return;
+  }
+  results.innerHTML = rows.map(item => {
+    const unit = String(item.satuan || "pcs").toLowerCase();
+    const liquid = unit === "ml" || unit === "gram";
+    const packSize = liquid ? Math.max(1, Number(item.isi_kemasan_beli) || 1000) : 1;
+    const sellSize = liquid ? Math.max(1, Number(item.isi_jual) || 100) : 1;
+    const hppBase = Number(item.hpp_rata_rata_per_dasar);
+    const hppPerBase = Number.isFinite(hppBase) && hppBase > 0
+      ? hppBase : (Number(item.harga_beli || 0) / packSize);
+    const modal = hppPerBase * sellSize;
+    return `<article class="dashboard-price-result">
+      <div class="dashboard-price-result-head"><strong>${escapeHtml(item.nama)}</strong><span class="dashboard-stock-pill ${Number(item.stok || 0) === 0 ? "out" : ""}">Stok ${Number(item.stok || 0).toLocaleString("id-ID")} ${escapeHtml(item.satuan || "pcs")}</span></div>
+      <div class="dashboard-price-values">
+        <div><small>Modal / HPP</small><strong>${money(modal)}</strong></div>
+        <div><small>Harga jual</small><strong class="dashboard-price-sale">${money(item.harga_jual)}</strong></div>
+      </div>
+    </article>`;
+  }).join("");
 }
 
 function renderInventory() {
@@ -1618,6 +1741,12 @@ function bind() {
   });
 
   $("#input-item-nama").addEventListener("input", renderSuggestions);
+  $("#dashboard-sparepart-search")?.addEventListener("input", renderDashboardSparepartSearch);
+  $("#dashboard-sparepart-clear")?.addEventListener("click", () => {
+    $("#dashboard-sparepart-search").value = "";
+    renderDashboardSparepartSearch();
+    $("#dashboard-sparepart-search").focus();
+  });
   $("#add-item").addEventListener("click", addCartItem);
   $("#tab-jasa").addEventListener("click", () => { state.tab = "jasa"; $("#tab-jasa").classList.add("active"); $("#tab-sparepart").classList.remove("active"); renderSuggestions(); });
   $("#tab-sparepart").addEventListener("click", () => { state.tab = "sparepart"; $("#tab-sparepart").classList.add("active"); $("#tab-jasa").classList.remove("active"); renderSuggestions(); });

@@ -1,5 +1,5 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b73ff"><title>OnePrint POS V2</title><link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261009-margin2">
+<link rel="stylesheet" href="css/app.css?v=20261009-dashboard1">
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script><script src="https://unpkg.com/html5-qrcode"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head><body>
 <div id="login-screen" hidden></div>
@@ -12,7 +12,28 @@
 <div class="welcome"><div><span class="eyebrow">OPERASIONAL HARI INI</span><h2>Ringkas, cepat, terkontrol.</h2>
 <div class="new-service-badge" id="new-badge" hidden>0 servis baru</div><p>Servis, stok, dan transaksi.</p></div><button class="ghost" data-page="services">Lihat semua servis →</button></div>
 <div class="stats-grid"><button id="dashboard-aktif" class="stat-card"><span>Servis Aktif</span><b id="stat-aktif">0</b><small>Dalam proses</small></button><button id="dashboard-sparepart" class="stat-card"><span>Menunggu Sparepart</span><b id="stat-sparepart">0</b><small>Perlu tindakan</small></button><button id="dashboard-selesai" class="stat-card"><span>Selesai</span><b id="stat-selesai">0</b><small>Siap diambil</small></button><div class="stat-card"><span>Total Servis</span><b id="stat-total">0</b><small>Semua data</small></div></div>
-<div class="section-head"><div><h3>Alur kerja</h3><p class="muted">Akses cepat.</p></div></div><div class="quick-grid"><button data-page="kasir"><b>＋ Terima Servis</b><span>Buat tanda terima</span></button><button data-page="services"><b>⌕ Cari Servis</b><span>Cari & edit</span></button><button id="scan-printer"><b>▣ Scan Unit</b><span>Identifikasi unit</span></button><button data-page="inventory"><b>▤ Kelola Inventori</b><span>Stok & harga</span></button><a href="scanner.html"><b>⌁ Scanner QR</b><span>Scan & buat QR</span></a></div>
+<div class="section-head"><div><h3>Akses cepat</h3><p class="muted">Pindai unit atau QR.</p></div></div>
+<div class="dashboard-scan-grid">
+  <button id="scan-printer" class="dashboard-scan-card"><span class="dashboard-scan-icon">▣</span><span><b>Scan Unit</b><small>Identifikasi unit & riwayat servis</small></span><span class="dashboard-card-arrow">→</span></button>
+  <a href="scanner.html" class="dashboard-scan-card"><span class="dashboard-scan-icon">⌁</span><span><b>Scanner QR</b><small>Pindai atau buat QR</small></span><span class="dashboard-card-arrow">→</span></a>
+</div>
+
+<section class="dashboard-panel" aria-labelledby="dashboard-income-title">
+  <div class="dashboard-panel-head"><div><h3 id="dashboard-income-title">Pendapatan Bulan Ini</h3><p class="muted" id="dashboard-income-period">Ringkasan per tanggal</p></div><strong id="dashboard-income-total">Rp 0</strong></div>
+  <div id="dashboard-income-chart" class="dashboard-income-chart" role="img" aria-label="Grafik pendapatan harian bulan berjalan"></div>
+</section>
+
+<section class="dashboard-panel" aria-labelledby="dashboard-stock-title">
+  <div class="dashboard-panel-head"><div><h3 id="dashboard-stock-title">Peringatan Stok Habis</h3><p class="muted">Hanya barang dengan stok nol.</p></div><span id="dashboard-stock-count" class="dashboard-count">0 barang</span></div>
+  <div id="dashboard-stock-empty" class="dashboard-empty">Tidak ada stok yang habis.</div>
+  <div id="dashboard-stock-list" class="dashboard-stock-list"></div>
+</section>
+
+<section class="dashboard-panel" aria-labelledby="dashboard-price-title">
+  <div class="dashboard-panel-head"><div><h3 id="dashboard-price-title">Quick Search Harga Sparepart</h3><p class="muted">Cari stok, modal, dan harga jual.</p></div></div>
+  <label class="dashboard-search"><span aria-hidden="true">⌕</span><input id="dashboard-sparepart-search" type="search" placeholder="Cari nama sparepart..." autocomplete="off"><button id="dashboard-sparepart-clear" type="button" class="ghost" hidden>Hapus</button></label>
+  <div id="dashboard-sparepart-results" class="dashboard-sparepart-results"><p class="dashboard-empty">Ketik nama sparepart untuk melihat harga.</p></div>
+</section>
 </section>
 <section id="page-kasir" class="page"><div class="page-grid">
 <div class="panel"><div class="panel-head"><div><span class="eyebrow">FORM SERVIS</span><h2 id="service-mode">Transaksi Baru</h2></div><button id="delete-service" class="danger-link" hidden>Hapus</button></div>
@@ -153,4 +174,4 @@
 <div id="scanner-modal" class="modal scanner-modal"><div class="scanner-box"><div class="panel-head"><div><span class="eyebrow">SCANNER</span><h2>Scan Barcode / QR</h2></div><button id="scanner-close" class="icon-btn">×</button></div><div id="app-reader" class="app-reader"></div><p id="scanner-result" class="muted">Arahkan kamera ke barcode.</p></div></div>
 </div>
 <div id="toast" class="toast"></div><div id="modal" class="modal"><div class="modal-box"><div class="panel-head"><h2 id="modal-title">Detail</h2><button id="modal-close" class="icon-btn">×</button></div><div id="modal-body"></div></div></div>
-<script type="module" src="js/app.js?v=20261009-margin2"></script><div id="print-container" aria-hidden="true"></div></body></html>
+<script type="module" src="js/app.js?v=20261009-dashboard1"></script><div id="print-container" aria-hidden="true"></div></body></html>
