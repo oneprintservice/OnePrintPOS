@@ -1,5 +1,5 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b73ff"><title>OnePrint POS V2</title><link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261007-ui-cleanup">
+<link rel="stylesheet" href="css/app.css?v=20261009-margin1">
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script><script src="https://unpkg.com/html5-qrcode"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head><body>
 <div id="login-screen" hidden></div>
@@ -25,7 +25,7 @@
 <label>Kategori<select id="inv-kategori"><option>sparepart</option><option>tinta</option><option>cairan</option><option>lisensi</option><option>jasa</option></select></label>
 <label>Satuan stok dasar<select id="inv-satuan"><option>pcs</option><option>ml</option><option>gram</option><option>unit</option></select></label>
 <label>Harga beli / kemasan<input id="inv-beli" type="number" min="0" placeholder="160000"></label>
-<label>Harga jual / unit jual<input id="inv-jual" type="number" min="0" placeholder="30000"></label>
+<label>Harga jual / unit jual<input id="inv-jual" type="number" min="0" placeholder="30000"></label>\n<label>Target margin (%)<input id="inv-target-margin" type="number" min="0" max="90" step="0.5" value="25" placeholder="25"></label>
 <label>Stok dasar<input id="inv-stok" type="number" min="0" placeholder="1000"></label>
 <label id="inv-pack-size-label">Isi kemasan beli<input id="inv-pack-size" type="number" min="1" value="1" placeholder="1000"></label>
 <label id="inv-sell-size-label">Isi per penjualan<input id="inv-sell-size" type="number" min="1" value="1" placeholder="100"></label>
@@ -88,8 +88,8 @@
       <p class="muted">Untuk label, QR, dan barcode. Terpisah dari LaserJet.</p>
       <div class="form-grid">
         <label>Mode label<select id="printer-mode"><option value="browser">Browser / dialog cetak</option><option value="bridge">Thermal via Bridge</option></select></label>
-        <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS (USB)</option><option value="winspool">Windows / Spooler (USB)</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Serial / Bluetooth (COM / TTY)</option></select></label>
-        <label class="span-2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181" placeholder="http://192.168.1.10:18181"></label>
+        <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS (USB)</option><option value="winspool">Windows / Spooler (USB)</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Serial / Bluetooth (COM / TTY)</option><option value="cleanter">Cleanter Bluetooth (Android)</option></select></label>
+        <label class="span-2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181" placeholder="PC Bridge: 18181 · Cleanter Android: localhost:9100"></label>
         <label id="printer-name-wrap"><span id="printer-name-label">Nama antrian CUPS</span><input id="printer-name" placeholder="Thermal_Label"></label>
         <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
         <label id="printer-port-wrap" hidden>Port<input id="printer-port" type="number" value="9100"></label>
@@ -98,6 +98,7 @@
         <label>Lebar kertas<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
         <label>Token bridge (opsional)<input id="printer-token" type="password" placeholder="Jika bridge diberi token"></label>
       </div>
+      <small class="muted">Cleanter Android: pilih transport Cleanter Bluetooth, gunakan http://localhost:9100, dan pastikan aplikasi Cleanter aktif. Port COM tidak diperlukan.</small>
       <div class="printer-settings-actions"><button id="printer-save" class="primary">Simpan Setting</button><button id="printer-test" class="secondary">Tes Bridge</button><button id="printer-test-print" class="ghost">Cetak Tes Thermal</button></div>
     </div>
   </div>
@@ -152,4 +153,4 @@
 <div id="scanner-modal" class="modal scanner-modal"><div class="scanner-box"><div class="panel-head"><div><span class="eyebrow">SCANNER</span><h2>Scan Barcode / QR</h2></div><button id="scanner-close" class="icon-btn">×</button></div><div id="app-reader" class="app-reader"></div><p id="scanner-result" class="muted">Arahkan kamera ke barcode.</p></div></div>
 </div>
 <div id="toast" class="toast"></div><div id="modal" class="modal"><div class="modal-box"><div class="panel-head"><h2 id="modal-title">Detail</h2><button id="modal-close" class="icon-btn">×</button></div><div id="modal-body"></div></div></div>
-<script type="module" src="js/app.js?v=20261007-ui-cleanup"></script><div id="print-container" aria-hidden="true"></div></body></html>
+<script type="module" src="js/app.js?v=20261009-margin1"></script><div id="print-container" aria-hidden="true"></div></body></html>

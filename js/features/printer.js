@@ -120,23 +120,27 @@ function targetFromThermal(config) {
 
 export async function testPrinterBridge(config = getPrinterConfig()) {
   const body = await bridgeFetch("/health", { method: "GET" }, config);
-  return { ok: body.ok === true, ...body };
+  // Cleanter v1.5.x reports {status:"ok"} while OnePrint Bridge reports {ok:true}.
+  return { ...body, ok: body.ok === true || body.status === "ok" };
 }
 
 export async function printThermal(data, tipe = "label", config = getPrinterConfig()) {
   if (config.mode !== "bridge") throw new Error("Mode printer thermal masih Browser");
   const thermal = config.thermal || DEFAULT_CONFIG.thermal;
 
-  // Cleanter berjalan langsung di Android dan menerima array content ESC/POS,
-  // bukan payload target serial milik OnePrint Printer Bridge untuk PC.
+  // Cleanter Android API accepts ESC/POS content blocks, not OnePrint PC bridge target objects.
   if (thermal.transport === "cleanter") {
     const code = String(data?.nomor || data?.serial || data?.kode || "").trim();
     if (!code) throw new Error("Kode QR kosong. Buat atau scan kode terlebih dahulu.");
+    const customer = String(data?.pelanggan || data?.customer || "").trim() || "-";
+    const unit = String(data?.merk || data?.unit || data?.tipe || "").trim() || "-";
     const content = [
       { type: "text", text: "ONEPRINT SERVICE", align: "center", bold: true },
-      { type: "text", text: code, align: "center", bold: true },
-      { type: "qr", data: code, size: 6, align: "center" },
-      { type: "feed", lines: 2 }
+      { type: "text", text: `Pelanggan: ${customer}`, align: "left" },
+      { type: "text", text: `Merk/Tipe: ${unit}`, align: "left" },
+      { type: "text", text: `Serial: ${code}`, align: "left", bold: true },
+      { type: "qr", data: code, size: 4, align: "center" },
+      { type: "feed", lines: 1 }
     ];
     return bridgeFetch("/print", {
       method: "POST",
@@ -166,8 +170,8 @@ export async function printTestReceipt(config = getPrinterConfig()) {
         content: [
           { type: "text", text: "ONEPRINT TEST", align: "center", bold: true },
           { type: "text", text: "Cleanter Bluetooth OK", align: "center" },
-          { type: "qr", data: "ONEPRINT-TEST", size: 5, align: "center" },
-          { type: "feed", lines: 2 }
+          { type: "qr", data: "ONEPRINT-TEST", size: 4, align: "center" },
+          { type: "feed", lines: 1 }
         ]
       })
     }, { ...config, bridgeUrl: config.bridgeUrl || "http://localhost:9100" });

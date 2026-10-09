@@ -39,10 +39,58 @@ export async function createRestock({
     ? Math.max(1, Number(isiKemasan) || Number(item.isi_kemasan_beli) || 1000)
     : 1;
 
+  const itemRef = db.ref(`inventori/${kategori}/${item.key}`);
+  const itemSnap = await itemRef.once("value");
+  const latestItem = itemSnap.val() || item;
+  const stockSnap = await itemRef.child("stok").once("value");
+  const current = Math.max(0, Number(stockSnap.val() || 0));
   const stockAdded = packages * packSize;
-  const stockSnap = await db.ref(`inventori/${kategori}/${item.key}/stok`).once("value");
-  const current = Number(stockSnap.val() || 0);
   const next = current + stockAdded;
+  const oldPackSize = liquid
+    ? Math.max(1, Number(latestItem.isi_kemasan_beli) || 1000)
+    : 1;
+  const legacyHpp = Math.max(0, Number(latestItem.harga_beli) || 0) / oldPackSize;
+  const oldHpp = current > 0
+    ? Math.max(0, Number(latestItem.hpp_rata_rata_per_dasar ?? legacyHpp) || 0)
+    : 0;
+  const newUnitCost = liquid ? unitCost / packSize : unitCost;
+  const weightedHpp = next > 0
+    ? ((current * oldHpp) + (stockAdded * newUnitCost)) / next
+    : newUnitCost;
+  const targetMargin = Math.min(90, Math.max(0, Number(latestItem.target_margin) || 25));
+  const basePrice = weightedHpp / (1 - targetMargin / 100);
+  const remainder = basePrice % 10000;
+  let suggestedPrice;
+  if (remainder <= 1000) suggestedPrice = Math.floor(basePrice / 10000) * 10000;
+  else if (remainder <= 5000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+  else if (remainder <= 6000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+  else suggestedPrice = (Math.floor(basePrice / 10000) + 1) * 10000;
+  // Never allow the custom rounding rule to undercut the configured target margin.
+  if (suggestedPrice + 0.000001 < basePrice) suggestedPrice = Math.ceil(basePrice / 5000) * 5000;
+  suggestedPrice = Math.max(0, Math.round(suggestedPrice));
+  const currentSalePrice = Math.max(0, Number(latestItem.harga_jual) || 0);
+  const previousRecommendation = latestItem.rekomendasi_harga || null;
+  const recommendation = Math.abs(suggestedPrice - currentSalePrice) >= 1
+    ? {
+        status: "pending",
+        harga_sekarang: currentSalePrice,
+        harga_saran: suggestedPrice,
+        hpp_rata_rata: weightedHpp,
+        target_margin: targetMargin,
+        margin_sekarang: currentSalePrice > 0 ? ((currentSalePrice - weightedHpp) / currentSalePrice) * 100 : 0,
+        margin_saran: suggestedPrice > 0 ? ((suggestedPrice - weightedHpp) / suggestedPrice) * 100 : 0,
+        restock_id: "",
+        dibuat_pada: new Date().toISOString()
+      }
+    : {
+        status: "none",
+        harga_sekarang: currentSalePrice,
+        harga_saran: suggestedPrice,
+        hpp_rata_rata: weightedHpp,
+        target_margin: targetMargin,
+        restock_id: "",
+        dibuat_pada: new Date().toISOString()
+      };
 
   const id = db.ref("restock").push().key;
   if (!id) throw new Error("Gagal membuat ID restock");
@@ -71,9 +119,18 @@ export async function createRestock({
     catatan: catatan || ""
   };
 
+  recommendation.restock_id = id;
+  restock.hpp_rata_rata_per_dasar = weightedHpp;
+  restock.harga_beli_per_dasar = newUnitCost;
+  restock.hpp_sebelum = oldHpp;
+  restock.hpp_setelah = weightedHpp;
+  restock.rekomendasi_sebelumnya = previousRecommendation;
+
   const updates = {};
   updates[`restock/${id}`] = restock;
   updates[`inventori/${kategori}/${item.key}/stok`] = next;
+  updates[`inventori/${kategori}/${item.key}/hpp_rata_rata_per_dasar`] = weightedHpp;
+  updates[`inventori/${kategori}/${item.key}/rekomendasi_harga`] = recommendation;
   if (total > 0) {
     updates[`keuangan/${id}`] = {
       tanggal: date,
@@ -118,6 +175,12 @@ export async function removeRestock(restock) {
   const updates = {};
   updates[`restock/${restock.key}`] = null;
   updates[`keuangan/${restock.key}`] = null;
+  if (restock.hpp_sebelum !== undefined) {
+    updates[`inventori/${restock.kategori}/${restock.itemKey}/hpp_rata_rata_per_dasar`] =
+      Number(restock.hpp_sebelum) || null;
+    updates[`inventori/${restock.kategori}/${restock.itemKey}/rekomendasi_harga`] =
+      restock.rekomendasi_sebelumnya || null;
+  }
   await db.ref().update(updates);
 
   return {

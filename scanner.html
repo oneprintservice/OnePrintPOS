@@ -63,7 +63,7 @@
 @media print{
   body *{visibility:hidden!important}
   #printArea,#printArea *{visibility:visible!important}
-  #printArea{display:block!important;position:absolute;left:0;top:0;width:48mm;padding:1mm;background:#fff;color:#000}
+  #printArea{display:block!important;position:absolute;left:0;top:0;width:48mm;max-width:48mm;padding:0;background:#fff;color:#000}
 }
 #printArea{display:none}
 </style>
@@ -97,8 +97,8 @@
     </div>
   </div>
   <div class="scanner-actions">
-    <button class="scanner-btn primary" onclick="printThermal()">Cetak Thermal</button>
-    <button class="scanner-btn ghost" onclick="printBrowser()">Cetak Browser</button>
+    <button class="scanner-btn primary" onclick="printThermal()">Cetak QR Bluetooth (RPP02)</button>
+    <button class="scanner-btn ghost" onclick="printBrowser()">Cetak via Browser (pilih printer)</button>
   </div>
 </section>
 
@@ -118,7 +118,7 @@
     <summary>Pengaturan printer thermal</summary>
     <div class="printer-form">
       <label>Mode<select id="printer-mode"><option value="browser">Browser</option><option value="bridge">Thermal Bridge</option></select></label>
-      <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS</option><option value="winspool">USB / Windows</option><option value="network">Wi-Fi / LAN</option><option value="serial">Bluetooth / COM (PC)</option><option value="cleanter">Cleanter Bluetooth (Android)</option></select></label>
+      <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS</option><option value="winspool">USB / Windows</option><option value="network">Wi-Fi / LAN</option><option value="serial">Bluetooth / COM</option><option value="cleanter">Cleanter Bluetooth (Android)</option></select></label>
       <label class="span2">Bridge URL<input id="printer-bridge-url" value="http://localhost:9100"></label>
       <label id="printer-name-wrap">Nama printer<input id="printer-name" placeholder="POS-80C"></label>
       <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
@@ -127,7 +127,7 @@
       <label id="printer-baud-wrap" hidden>Baud<input id="printer-baud" type="number" value="9600"></label>
       <label>Lebar<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
       <label>Token<input id="printer-token" type="password"></label>
-      <div class="span2 bridge-note">Cleanter Android: gunakan http://localhost:9100 dan transport Cleanter Bluetooth. COM/serial hanya untuk bridge PC. Nota/invoice LaserJet tidak terpengaruh.</div>
+      <div class="span2 bridge-note">Android: pilih Cleanter Bluetooth. Pastikan aplikasi Cleanter aktif dan printer RPP02 berstatus Connected. Mode ini tidak memerlukan COM/serial.</div>
       <button class="scanner-btn primary span2" onclick="savePrinterSettings()">Simpan & Tes</button>
     </div>
   </details>
@@ -137,28 +137,29 @@
 </div>
 
 <div id="printArea">
-  <div style="text-align:center;font-family:Arial,sans-serif">
-    <div style="font-size:10px;font-weight:700">ONEPRINT SERVICE</div>
-    <div style="font-size:8px">Identitas unit servis</div>
-    <div style="border-top:1px dashed #000;margin:2px 0"></div>
-    <div id="printCode" style="font-size:7px"></div>
-    <div id="printCustomer" style="font-size:7px"></div>
-    <div id="printUnit" style="font-size:7px"></div>
-    <div style="margin-top:3px"><canvas id="printQR"></canvas></div>
+  <div class="print-label" style="text-align:center;font-family:Arial,sans-serif">
+    <div class="print-title">ONEPRINT SERVICE</div>
+    <div id="printCustomer" class="print-line"></div>
+    <div id="printUnit" class="print-line"></div>
+    <div id="printCode" class="print-line"></div>
+    <canvas id="printQR" width="96" height="96" style="display:block;width:24mm;height:24mm;margin:1mm auto 0"></canvas>
   </div>
 </div>
 
 <script type="module">
-import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt, printThermal } from "./js/features/printer.js?v=20261005-premium4";
+import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt, printThermal } from "./js/features/printer.js?v=20261009-cleanter-label3";
 
 const $ = id => document.getElementById(id);
 let html5QrCode = null;
 let scannerRunning = false;
 
 function getConfigFromForm(){
+  const existing=getPrinterConfig();
+  const transport=$("printer-transport").value;
   return {
+    ...existing,
     mode:$("printer-mode").value,
-    bridgeUrl:$("printer-bridge-url").value.trim(),
+    bridgeUrl:transport==="cleanter" ? ($("printer-bridge-url").value.trim()||"http://localhost:9100") : $("printer-bridge-url").value.trim(),
     thermal:{
       transport:$("printer-transport").value,
       printerName:$("printer-name").value.trim(),
@@ -174,10 +175,11 @@ function getConfigFromForm(){
 function fillPrinter(){
   const c=getPrinterConfig();
   const t=c.thermal||{};
-  $("printer-mode").value=c.mode;
-  const legacySerial = (t.transport === "serial" && !t.serialPath && /:(18181|9100)\/?$/i.test(c.bridgeUrl || ""));
-  $("printer-bridge-url").value=legacySerial ? "http://localhost:9100" : (c.bridgeUrl || "http://localhost:9100");
-  $("printer-transport").value=legacySerial ? "cleanter" : (t.transport||"cups");
+  const legacySerial=(t.transport==="serial" && !t.serialPath && /:(18181|9100)\/?$/i.test(c.bridgeUrl||""));
+  const legacyCleanter=t.transport==="cleanter" && /:18181\/?$/i.test(c.bridgeUrl||"");
+  $("printer-mode").value=(t.transport==="cleanter")?"bridge":c.mode;
+  $("printer-bridge-url").value=(legacySerial||legacyCleanter)?"http://localhost:9100":(c.bridgeUrl||"http://localhost:9100");
+  $("printer-transport").value=legacySerial?"cleanter":(t.transport||"cups");
   $("printer-name").value=t.printerName||"";
   $("printer-host").value=t.host||"";
   $("printer-port").value=t.port||9100;
@@ -194,6 +196,11 @@ function updateTransport(){
   $("printer-port-wrap").hidden=t!=="network";
   $("printer-serial-wrap").hidden=t!=="serial";
   $("printer-baud-wrap").hidden=t!=="serial";
+  const url=$("printer-bridge-url");
+  if(t==="cleanter"){
+    if(url && (!url.value || /:18181\/?$/i.test(url.value))) url.value="http://localhost:9100";
+    $("printer-mode").value="bridge";
+  }
 }
 $("printer-transport").addEventListener("change",updateTransport);
 
@@ -202,52 +209,54 @@ window.generateRandomCode=function(){
   $("manualCode").value=`OPS-${String(d.getFullYear()).slice(-2)}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*900+100)}`;
   generateQR();
 };
-window.generateQR=function(){
+window.generateQR=async function(){
   const code=$("manualCode").value.trim();
-  if(!code) return alert("Masukkan kode terlebih dahulu");
+  if(!code) throw new Error("Masukkan atau buat serial/ID terlebih dahulu.");
   const customer=$("customer").value.trim();
   const unit=$("unit").value.trim();
-  QRCode.toCanvas($("qrcode"),code,{width:220,margin:1});
-  QRCode.toCanvas($("printQR"),code,{width:100,margin:1});
+  await Promise.all([
+    new Promise((resolve,reject)=>QRCode.toCanvas($("qrcode"),code,{width:220,margin:1},err=>err?reject(err):resolve())),
+    new Promise((resolve,reject)=>QRCode.toCanvas($("printQR"),code,{width:96,margin:1},err=>err?reject(err):resolve()))
+  ]);
   $("previewCode").textContent=code;
   $("previewInfo").textContent=`${customer||"-"} · ${unit||"-"}`;
-  $("printCode").textContent=`ID : ${code}`;
-  $("printCustomer").textContent=`Nama : ${customer||"-"}`;
-  $("printUnit").textContent=`Unit : ${unit||"-"}`;
+  $("printCode").textContent=`Serial: ${code}`;
+  $("printCustomer").textContent=`Pelanggan: ${customer||"-"}`;
+  $("printUnit").textContent=`Merk/Tipe: ${unit||"-"}`;
+  return code;
 };
-window.printBrowser=function(){
-  generateQR();
-  setTimeout(()=>window.print(),250);
+window.printBrowser=async function(){
+  try{
+    await generateQR();
+    // Jalur browser tetap menggunakan dialog cetak Chrome; thermal bridge terpisah.
+    setTimeout(()=>window.print(),150);
+  }catch(e){ alert(e.message||"QR belum siap dicetak."); }
 };
 window.printThermal=async function(){
-  generateQR();
-  const cfg=savePrinterConfig(getConfigFromForm());
-  if(cfg.mode!=="bridge"){
-    window.print();
-    return;
-  }
   try{
+    await generateQR();
+    const cfg=savePrinterConfig(getConfigFromForm());
+    if(cfg.thermal?.transport!=="cleanter") throw new Error("Pilih transport Cleanter Bluetooth (Android) pada pengaturan printer thermal.");
+    const code=$("manualCode").value.trim();
     await printThermal({
-      nomor:$("manualCode").value.trim(),
-      pelanggan:$("customer").value.trim(),
-      merk:$("unit").value.trim(),
-      serial:$("manualCode").value.trim(),
-      total:0,
-      jasa:[],
-      sparepart:[]
-    },"tanda-terima",cfg);
-    alert("Perintah cetak thermal terkirim.");
-  }catch(e){ alert(e.message||"Cetak thermal gagal."); }
+      nomor:code, pelanggan:$("customer").value.trim(), merk:$("unit").value.trim(), serial:code
+    },"label",{...cfg,mode:"bridge",bridgeUrl:cfg.bridgeUrl||"http://localhost:9100"});
+    alert("Label QR dikirim ke printer RPP02.");
+  }catch(e){ alert(e.message||"Cetak QR Bluetooth gagal."); }
 };
 window.savePrinterSettings=async function(){
   const cfg=savePrinterConfig(getConfigFromForm());
-  if(cfg.mode!=="bridge") return alert("Setting disimpan. Mode Browser aktif.");
+  const btn=document.querySelector('[onclick="savePrinterSettings()"]');
+  const oldText=btn?.textContent;
+  if(btn){btn.disabled=true;btn.textContent="Menguji koneksi…";}
   try{
-    const health = await testPrinterBridge(cfg);
-    if(cfg.thermal?.transport === "cleanter" && health.status !== "ok") throw new Error("Cleanter merespons, tetapi status health tidak OK.");
-    await printTestReceipt(cfg);
-    alert("Koneksi bridge berhasil. Cetak tes sudah dikirim.");
+    if(cfg.thermal?.transport!=="cleanter") throw new Error("Pilih Cleanter Bluetooth (Android) untuk tes dari HP.");
+    const health=await testPrinterBridge({...cfg,bridgeUrl:cfg.bridgeUrl||"http://localhost:9100"});
+    if(!health.ok) throw new Error("Cleanter tidak merespons status OK.");
+    await printTestReceipt({...cfg,mode:"bridge",bridgeUrl:cfg.bridgeUrl||"http://localhost:9100"});
+    alert("Cleanter terhubung. Label tes dikirim ke RPP02.");
   }catch(e){ alert(e.message||"Bridge belum tersambung."); }
+  finally{if(btn){btn.disabled=false;btn.textContent=oldText||"Simpan & Tes";}}
 };
 
 window.toggleScanner=async function(){

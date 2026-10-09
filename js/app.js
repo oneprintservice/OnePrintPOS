@@ -1,6 +1,6 @@
 import { auth } from "./core/firebase.js";
 import { watchAuth, signOut, startIdleTimeout } from "./core/auth.js";
-import { listInventory, saveInventory, removeInventory, changeStock } from "./features/inventory.js";
+import { listInventory, saveInventory, removeInventory, changeStock, applyPriceRecommendation, declinePriceRecommendation } from "./features/inventory.js?v=20261009-margin1";
 import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
@@ -8,8 +8,8 @@ import {
 } from "./features/services.js?v=20261003-fix8";
 import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
 import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
-import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261005-premium2";
+import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261009-cleanter-label3";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261009-margin1";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -178,9 +178,9 @@ function renderInventory() {
   $("#inventory-count").textContent = `${rows.length} item`;
   $("#inventory-list").innerHTML = rows.map(x => `<tr>
     <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.kategori)} · stok ${escapeHtml(x.satuan || "pcs")} · jual ${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td>
-    <td>${money(x.harga_jual)}<small>${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td><td>${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "pcs")}</td><td>${money(x.harga_beli)}<small>/ kemasan</small></td>
+    <td>${money(x.harga_jual)}<small>${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td><td>${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "pcs")}</td><td>${money(x.harga_beli)}<small>/ kemasan</small><small>HPP rata-rata: ${money(x.hpp_rata_rata_per_dasar ?? (Number(x.harga_beli || 0) / (isLiquidInventoryUnit(x.satuan) ? Number(x.isi_kemasan_beli || 1000) : 1)))}/${escapeHtml(x.satuan || "unit")}</small></td>
     <td><span class="stock ${Number(x.stok || 0) <= Number(x.minimum || 1) ? "low" : ""}">${Number(x.stok || 0) <= Number(x.minimum || 1) ? "Menipis" : "Aman"}</span></td>
-    <td><button class="table-action" data-edit-inv="${x.kategori}:${x.key}">Edit</button><button class="table-action danger" data-del-inv="${x.kategori}:${x.key}">Hapus</button></td>
+    <td>${x.rekomendasi_harga?.status === "pending" ? `<div class="price-recommendation"><strong>Harga saran: ${money(x.rekomendasi_harga.harga_saran)}</strong><small>Target margin ${Number(x.rekomendasi_harga.target_margin || 25)}% · margin saran ${Number(x.rekomendasi_harga.margin_saran || 0).toFixed(1)}%</small><button type="button" class="table-action" data-apply-price="${escapeHtml(x.kategori)}:${escapeHtml(x.key)}">Apply</button><button type="button" class="table-action danger" data-decline-price="${escapeHtml(x.kategori)}:${escapeHtml(x.key)}">Decline</button></div>` : ""}<button class="table-action" data-edit-inv="${x.kategori}:${x.key}">Edit</button><button class="table-action danger" data-del-inv="${x.kategori}:${x.key}">Hapus</button></td>
   </tr>`).join("") || `<tr><td colspan="6" class="empty">Belum ada inventori.</td></tr>`;
 }
 
@@ -1159,20 +1159,42 @@ function renderRestockCalculation() {
   const liquid = isLiquidInventoryUnit(inv.satuan);
   const added = packages * packSize;
   const perBase = liquid ? price / packSize : price;
+  const currentStock = Math.max(0, Number(inv.stok || 0));
+  const oldPackSize = liquid ? Math.max(1, Number(inv.isi_kemasan_beli) || 1000) : 1;
+  const legacyHpp = Math.max(0, Number(inv.harga_beli) || 0) / oldPackSize;
+  const oldHpp = currentStock > 0 ? Math.max(0, Number(inv.hpp_rata_rata_per_dasar ?? legacyHpp) || 0) : 0;
+  const predictedStock = currentStock + added;
+  const weightedHpp = predictedStock > 0 ? ((currentStock * oldHpp) + (added * perBase)) / predictedStock : perBase;
+  const targetMargin = Math.min(90, Math.max(0, Number(inv.target_margin) || 25));
+  const basePrice = weightedHpp / (1 - targetMargin / 100);
+  const remainder = basePrice % 10000;
+  let suggestedPrice;
+  if (remainder <= 1000) suggestedPrice = Math.floor(basePrice / 10000) * 10000;
+  else if (remainder <= 5000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+  else if (remainder <= 6000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+  else suggestedPrice = (Math.floor(basePrice / 10000) + 1) * 10000;
+  if (suggestedPrice + 0.000001 < basePrice) suggestedPrice = Math.ceil(basePrice / 5000) * 5000;
+  const marginNow = Number(inv.harga_jual || 0) > 0 ? ((Number(inv.harga_jual) - weightedHpp) / Number(inv.harga_jual)) * 100 : 0;
+  const marginSuggested = suggestedPrice > 0 ? ((suggestedPrice - weightedHpp) / suggestedPrice) * 100 : 0;
 
   box.hidden = false;
   box.innerHTML = `
     <div><span>Akan masuk stok</span><strong>${added.toLocaleString("id-ID")} ${escapeHtml(inv.satuan || "pcs")}</strong></div>
     <div><span>Total pembelian</span><strong>${money(packages * price)}</strong></div>
-    <div><span>HPP / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(perBase)}</strong></div>
-    ${liquid ? `<small>Contoh: ${packages || 1} kemasan × ${packSize.toLocaleString("id-ID")} ${escapeHtml(inv.satuan)}. Harga jual dihitung terpisah per unit jual.</small>` : ""}
+    <div><span>HPP pembelian baru / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(perBase)}</strong></div>
+    <div><span>Prediksi HPP rata-rata / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(weightedHpp)}</strong></div>
+    <div><span>Target margin</span><strong>${targetMargin}%</strong></div>
+    <div><span>Harga jual sekarang</span><strong>${money(inv.harga_jual)}</strong></div>
+    <div><span>Harga jual disarankan</span><strong>${money(suggestedPrice)}</strong></div>
+    <small>Margin saat ini terhadap HPP prediksi: ${marginNow.toFixed(1)}% · margin rekomendasi: ${marginSuggested.toFixed(1)}%. Harga tidak berubah sebelum kamu memilih Apply.</small>
+    ${liquid ? `<small>Stok dihitung dalam ${escapeHtml(inv.satuan)}; harga pembelian dikonversi ke biaya per ${escapeHtml(inv.satuan)}.</small>` : ""}
   `;
 }
 
 function getPrinterFormConfig() {
   return {
     mode: $("#printer-mode")?.value || "browser",
-    bridgeUrl: $("#printer-bridge-url")?.value.trim() || "http://127.0.0.1:18181",
+    bridgeUrl: $("#printer-bridge-url")?.value.trim() || (($("#printer-transport")?.value === "cleanter") ? "http://localhost:9100" : "http://127.0.0.1:18181"),
     document: {
       transport: $("#printer-document-transport")?.value || "cups",
       printerName: $("#printer-document-name")?.value.trim() || "",
@@ -1197,7 +1219,7 @@ function fillPrinterFormConfig(config = {}) {
   const legacy = !config.thermal && !config.document ? config : {};
   const values = {
     "printer-mode": config.mode || "browser",
-    "printer-bridge-url": config.bridgeUrl || "http://127.0.0.1:18181",
+    "printer-bridge-url": (thermal.transport === "cleanter" && (!config.bridgeUrl || /:18181\/?$/.test(config.bridgeUrl))) ? "http://localhost:9100" : (config.bridgeUrl || "http://127.0.0.1:18181"),
     "printer-document-transport": document.transport || "cups",
     "printer-document-name": document.printerName || "",
     "printer-document-paper": document.paper || "A5",
@@ -1223,14 +1245,20 @@ function updatePrinterTransportUI() {
   const win = transport === "winspool";
   const net = transport === "network";
   const serial = transport === "serial";
+  const cleanter = transport === "cleanter";
   const nameLabel = $("#printer-name-label");
   const nameInput = $("#printer-name");
 
-  $("#printer-name-wrap")?.toggleAttribute("hidden", !(win || cups));
+  $("#printer-name-wrap")?.toggleAttribute("hidden", cleanter || !(win || cups));
   $("#printer-host-wrap")?.toggleAttribute("hidden", !net);
   $("#printer-port-wrap")?.toggleAttribute("hidden", !net);
   $("#printer-serial-wrap")?.toggleAttribute("hidden", !serial);
   $("#printer-baud-wrap")?.toggleAttribute("hidden", !serial);
+  const bridgeUrl = $("#printer-bridge-url");
+  if (cleanter) {
+    if (bridgeUrl && (!bridgeUrl.value || /:18181\/?$/.test(bridgeUrl.value))) bridgeUrl.value = "http://localhost:9100";
+    if ($("#printer-mode")) $("#printer-mode").value = "bridge";
+  }
 
   if (nameLabel) {
     nameLabel.textContent = cups
@@ -1353,6 +1381,32 @@ function bind() {
     const open = e.target.closest("[data-open-service]");
     if (open) { await openService(open.dataset.openService); return; }
 
+    const applyPrice = e.target.closest("[data-apply-price]");
+    if (applyPrice) {
+      const [cat, key] = applyPrice.dataset.applyPrice.split(":");
+      try {
+        const price = await applyPriceRecommendation(cat, key);
+        await loadAll();
+        view.toast(`Harga jual berhasil diperbarui menjadi ${money(price)}.`, "success");
+      } catch (error) {
+        view.toast(error.message || "Gagal menerapkan harga rekomendasi.", "error");
+      }
+      return;
+    }
+
+    const declinePrice = e.target.closest("[data-decline-price]");
+    if (declinePrice) {
+      const [cat, key] = declinePrice.dataset.declinePrice.split(":");
+      try {
+        await declinePriceRecommendation(cat, key);
+        await loadAll();
+        view.toast("Rekomendasi ditolak. Harga jual tetap.", "info");
+      } catch (error) {
+        view.toast(error.message || "Gagal menolak rekomendasi.", "error");
+      }
+      return;
+    }
+
     const edit = e.target.closest("[data-edit-inv]");
     if (edit) {
       const [cat, key] = edit.dataset.editInv.split(":");
@@ -1360,7 +1414,7 @@ function bind() {
       if (x) {
         state.editInventoryKey = key; state.editInventoryCategory = cat;
         $("#inv-nama").value = x.nama; $("#inv-kategori").value = cat;
-        $("#inv-beli").value = x.harga_beli || 0; $("#inv-jual").value = x.harga_jual || 0;
+        $("#inv-beli").value = x.harga_beli || 0; $("#inv-jual").value = x.harga_jual || 0; $("#inv-target-margin").value = x.target_margin ?? 25;
         $("#inv-stok").value = x.stok || 0; $("#inv-satuan").value = x.satuan || "pcs";
         $("#inv-pack-size").value = x.isi_kemasan_beli || ((x.satuan || "").toLowerCase() === "ml" ? 1000 : 1);
         $("#inv-sell-size").value = x.isi_jual || ((x.satuan || "").toLowerCase() === "ml" ? 100 : 1);
@@ -1638,6 +1692,7 @@ function bind() {
     const item = {
       nama: $("#inv-nama").value, kategori: $("#inv-kategori").value,
       harga_beli: $("#inv-beli").value, harga_jual: $("#inv-jual").value,
+      target_margin: $("#inv-target-margin").value,
       stok: $("#inv-stok").value, satuan: $("#inv-satuan").value,
       isi_kemasan_beli: $("#inv-pack-size").value,
       isi_jual: $("#inv-sell-size").value,
@@ -1646,7 +1701,7 @@ function bind() {
     if (!item.nama.trim()) return view.toast("Nama barang wajib diisi", "error");
     await saveInventory(item, state.editInventoryKey, state.editInventoryCategory);
     state.editInventoryKey = null; state.editInventoryCategory = null;
-    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = "");
+    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = ""); $("#inv-target-margin").value = "25";
     await loadAll(); view.toast("Inventori berhasil disimpan", "success");
   });
 
@@ -1743,7 +1798,10 @@ function bind() {
       .slice(0, 50);
     renderRestock();
     await loadAll();
-    view.toast(`Restock ${result.nama} berhasil. Stok sekarang ${result.stokBaru}.`, "success");
+    switchPage("inventory");
+    view.toast(result.rekomendasi_harga?.status === "pending"
+      ? `Restock berhasil. Harga jual disarankan ${money(result.rekomendasi_harga.harga_saran)}; pilih Apply atau Decline di Inventori.`
+      : `Restock ${result.nama} berhasil. Stok sekarang ${result.stokBaru}.`, "success");
   });
 
   $("#cancel-manual-ledger")?.addEventListener("click", () => {

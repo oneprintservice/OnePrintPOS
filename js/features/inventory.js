@@ -50,9 +50,18 @@ export async function saveInventory(item, editingKey = null, editingCategory = n
     satuan_jual: item.satuan_jual || (liquid ? `${sellSize}${baseUnit}` : baseUnit),
     isi_kemasan_beli: purchasePackSize,
     satuan_kemasan_beli: item.satuan_kemasan_beli || (liquid ? `botol/${purchasePackSize}${baseUnit}` : baseUnit),
-    minimum: Number(item.minimum) || (liquid ? sellSize : 1)
+    minimum: Number(item.minimum) || (liquid ? sellSize : 1),
+    target_margin: Math.min(90, Math.max(0, Number(item.target_margin ?? item.targetMargin) || 25))
   };
   const targetCategory = editingCategory || kategori;
+  const existingSnap = editingKey
+    ? await db.ref(`inventori/${targetCategory}/${key}`).once("value")
+    : null;
+  const existing = existingSnap?.val() || {};
+  if (Number.isFinite(Number(existing.hpp_rata_rata_per_dasar)) && existing.hpp_rata_rata_per_dasar !== undefined) {
+    data.hpp_rata_rata_per_dasar = Number(existing.hpp_rata_rata_per_dasar);
+  }
+  if (existing.rekomendasi_harga) data.rekomendasi_harga = existing.rekomendasi_harga;
   await db.ref(`inventori/${targetCategory}/${key}`).set(data);
   if (editingCategory && editingCategory !== kategori) await db.ref(`inventori/${editingCategory}/${editingKey}`).remove();
   return { kategori: targetCategory, key, ...data };
@@ -71,4 +80,45 @@ export async function changeStock(item, delta) {
   await db.ref(`inventori/${item.kategori}/${item.key}/stok`).set(next);
   item.stok = next;
   return next;
+}
+
+
+export async function applyPriceRecommendation(kategori, key) {
+  const ref = db.ref(`inventori/${kategori}/${key}`);
+  const snap = await ref.once("value");
+  const item = snap.val();
+  const rec = item?.rekomendasi_harga;
+  if (!item || !rec || rec.status !== "pending" || !Number.isFinite(Number(rec.harga_saran))) {
+    throw new Error("Rekomendasi harga tidak tersedia atau sudah diproses");
+  }
+  const now = new Date().toISOString();
+  const updates = {};
+  updates[`inventori/${kategori}/${key}/harga_jual`] = Number(rec.harga_saran);
+  updates[`inventori/${kategori}/${key}/rekomendasi_harga/status`] = "applied";
+  updates[`inventori/${kategori}/${key}/rekomendasi_harga/diproses_pada`] = now;
+  updates[`inventori/${kategori}/${key}/riwayat_harga/${db.ref().push().key}`] = {
+    harga_sebelum: Number(item.harga_jual || 0),
+    harga_sesudah: Number(rec.harga_saran),
+    hpp_rata_rata: Number(rec.hpp_rata_rata || 0),
+    target_margin: Number(rec.target_margin || 25),
+    sumber: "rekomendasi_restok",
+    restock_id: rec.restock_id || "",
+    tanggal: now
+  };
+  await db.ref().update(updates);
+  return Number(rec.harga_saran);
+}
+
+export async function declinePriceRecommendation(kategori, key) {
+  const ref = db.ref(`inventori/${kategori}/${key}`);
+  const snap = await ref.once("value");
+  const item = snap.val();
+  const rec = item?.rekomendasi_harga;
+  if (!item || !rec || rec.status !== "pending") {
+    throw new Error("Rekomendasi harga tidak tersedia atau sudah diproses");
+  }
+  await ref.child("rekomendasi_harga").update({
+    status: "declined",
+    diproses_pada: new Date().toISOString()
+  });
 }
