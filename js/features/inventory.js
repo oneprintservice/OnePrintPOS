@@ -2,6 +2,20 @@ import { db } from "../core/firebase.js";
 
 const CATEGORIES = ["sparepart", "tinta", "cairan", "lisensi", "jasa"];
 
+export function getHistoricalMargin(item = {}) {
+  const unit = String(item.satuan || "pcs").toLowerCase();
+  const liquid = unit === "ml" || unit === "gram";
+  const packSize = liquid ? Math.max(1, Number(item.isi_kemasan_beli) || 1000) : 1;
+  const sellSize = liquid ? Math.max(1, Number(item.isi_jual) || 100) : 1;
+  const hppBase = Number(item.hpp_rata_rata_per_dasar);
+  const fallbackBase = (Number(item.harga_beli) || 0) / packSize;
+  const hppBaseValue = Number.isFinite(hppBase) && hppBase > 0 ? hppBase : fallbackBase;
+  const hppPerSale = hppBaseValue * sellSize;
+  const sale = Number(item.harga_jual) || 0;
+  if (!(sale > 0) || !(hppPerSale > 0) || sale <= hppPerSale) return null;
+  return Math.min(90, Math.max(0, ((sale - hppPerSale) / sale) * 100));
+}
+
 function looksLikeItem(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   return Boolean(value.nama || value.harga_jual !== undefined || value.harga_beli !== undefined || value.stok !== undefined);
@@ -51,7 +65,12 @@ export async function saveInventory(item, editingKey = null, editingCategory = n
     isi_kemasan_beli: purchasePackSize,
     satuan_kemasan_beli: item.satuan_kemasan_beli || (liquid ? `botol/${purchasePackSize}${baseUnit}` : baseUnit),
     minimum: Number(item.minimum) || (liquid ? sellSize : 1),
-    target_margin: Math.min(90, Math.max(0, Number(item.target_margin ?? item.targetMargin) || 25))
+    target_margin: item.target_margin !== "" && item.target_margin !== undefined && item.target_margin !== null
+      ? Math.min(90, Math.max(0, Number(item.target_margin) || 0))
+      : (getHistoricalMargin(item) ?? null),
+    target_margin_source: item.target_margin !== "" && item.target_margin !== undefined && item.target_margin !== null
+      ? "manual"
+      : "historical"
   };
   const targetCategory = editingCategory || kategori;
   const existingSnap = editingKey
@@ -62,6 +81,7 @@ export async function saveInventory(item, editingKey = null, editingCategory = n
     data.hpp_rata_rata_per_dasar = Number(existing.hpp_rata_rata_per_dasar);
   }
   if (existing.rekomendasi_harga) data.rekomendasi_harga = existing.rekomendasi_harga;
+  if (existing.riwayat_harga) data.riwayat_harga = existing.riwayat_harga;
   await db.ref(`inventori/${targetCategory}/${key}`).set(data);
   if (editingCategory && editingCategory !== kategori) await db.ref(`inventori/${editingCategory}/${editingKey}`).remove();
   return { kategori: targetCategory, key, ...data };
@@ -100,7 +120,7 @@ export async function applyPriceRecommendation(kategori, key) {
     harga_sebelum: Number(item.harga_jual || 0),
     harga_sesudah: Number(rec.harga_saran),
     hpp_rata_rata: Number(rec.hpp_rata_rata || 0),
-    target_margin: Number(rec.target_margin || 25),
+    target_margin: rec.target_margin !== null && rec.target_margin !== undefined ? Number(rec.target_margin) : null,
     sumber: "rekomendasi_restok",
     restock_id: rec.restock_id || "",
     tanggal: now

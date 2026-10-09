@@ -1,4 +1,5 @@
 import { db } from "../core/firebase.js";
+import { getHistoricalMargin } from "./inventory.js";
 
 export async function listRestocks(limit = 50) {
   const snap = await db.ref("restock").once("value");
@@ -57,28 +58,55 @@ export async function createRestock({
   const weightedHpp = next > 0
     ? ((current * oldHpp) + (stockAdded * newUnitCost)) / next
     : newUnitCost;
-  const targetMargin = Math.min(90, Math.max(0, Number(latestItem.target_margin) || 25));
-  const basePrice = weightedHpp / (1 - targetMargin / 100);
+  const sellSize = liquid ? Math.max(1, Number(latestItem.isi_jual) || 100) : 1;
+  const currentHppPerSale = oldHpp * sellSize;
+  const historicalMargin = getHistoricalMargin({
+    ...latestItem,
+    hpp_rata_rata_per_dasar: current > 0 ? oldHpp : legacyHpp,
+    harga_jual: latestItem.harga_jual
+  });
+  const hasManualTarget = latestItem.target_margin_source === "manual"
+    && latestItem.target_margin !== null
+    && latestItem.target_margin !== undefined
+    && latestItem.target_margin !== "";
+  const targetMargin = hasManualTarget
+    ? Math.min(90, Math.max(0, Number(latestItem.target_margin) || 0))
+    : historicalMargin;
+  const targetAvailable = targetMargin !== null && Number.isFinite(targetMargin);
+  const effectiveHpp = weightedHpp * sellSize;
+  const basePrice = targetAvailable ? effectiveHpp / (1 - targetMargin / 100) : 0;
   const remainder = basePrice % 10000;
-  let suggestedPrice;
-  if (remainder <= 1000) suggestedPrice = Math.floor(basePrice / 10000) * 10000;
-  else if (remainder <= 5000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
-  else if (remainder <= 6000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
-  else suggestedPrice = (Math.floor(basePrice / 10000) + 1) * 10000;
-  // Never allow the custom rounding rule to undercut the configured target margin.
-  if (suggestedPrice + 0.000001 < basePrice) suggestedPrice = Math.ceil(basePrice / 5000) * 5000;
-  suggestedPrice = Math.max(0, Math.round(suggestedPrice));
+  let suggestedPrice = 0;
+  if (targetAvailable) {
+    if (remainder <= 1000) suggestedPrice = Math.floor(basePrice / 10000) * 10000;
+    else if (remainder <= 5000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+    else if (remainder <= 6000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+    else suggestedPrice = (Math.floor(basePrice / 10000) + 1) * 10000;
+    // Never allow custom rounding to undercut the configured/historical target margin.
+    if (suggestedPrice + 0.000001 < basePrice) suggestedPrice = Math.ceil(basePrice / 5000) * 5000;
+    suggestedPrice = Math.max(0, Math.round(suggestedPrice));
+  }
   const currentSalePrice = Math.max(0, Number(latestItem.harga_jual) || 0);
   const previousRecommendation = latestItem.rekomendasi_harga || null;
-  const recommendation = Math.abs(suggestedPrice - currentSalePrice) >= 1
+  const recommendation = !targetAvailable
+    ? {
+        status: "needs_target",
+        harga_sekarang: currentSalePrice,
+        harga_saran: null,
+        hpp_rata_rata: weightedHpp,
+        target_margin: null,
+        restock_id: "",
+        dibuat_pada: new Date().toISOString()
+      }
+    : Math.abs(suggestedPrice - currentSalePrice) >= 1
     ? {
         status: "pending",
         harga_sekarang: currentSalePrice,
         harga_saran: suggestedPrice,
         hpp_rata_rata: weightedHpp,
         target_margin: targetMargin,
-        margin_sekarang: currentSalePrice > 0 ? ((currentSalePrice - weightedHpp) / currentSalePrice) * 100 : 0,
-        margin_saran: suggestedPrice > 0 ? ((suggestedPrice - weightedHpp) / suggestedPrice) * 100 : 0,
+        margin_sekarang: currentSalePrice > 0 ? ((currentSalePrice - effectiveHpp) / currentSalePrice) * 100 : 0,
+        margin_saran: suggestedPrice > 0 ? ((suggestedPrice - effectiveHpp) / suggestedPrice) * 100 : 0,
         restock_id: "",
         dibuat_pada: new Date().toISOString()
       }
@@ -122,6 +150,8 @@ export async function createRestock({
   recommendation.restock_id = id;
   restock.hpp_rata_rata_per_dasar = weightedHpp;
   restock.harga_beli_per_dasar = newUnitCost;
+  restock.hpp_per_unit_jual = weightedHpp * sellSize;
+  restock.target_margin_sumber = hasManualTarget ? "manual" : (targetAvailable ? "historical" : "needs_target");
   restock.hpp_sebelum = oldHpp;
   restock.hpp_setelah = weightedHpp;
   restock.rekomendasi_sebelumnya = previousRecommendation;
