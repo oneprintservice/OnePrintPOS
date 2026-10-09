@@ -61,11 +61,22 @@
   .printer-form .span2{grid-column:auto}
 }
 @media print{
+  @page{size:58mm auto;margin:0}
+  html,body{width:58mm!important;margin:0!important;padding:0!important;background:#fff!important}
   body *{visibility:hidden!important}
   #printArea,#printArea *{visibility:visible!important}
-  #printArea{display:block!important;position:absolute;left:0;top:0;width:48mm;max-width:48mm;padding:0;background:#fff;color:#000}
+  #printArea{display:block!important;position:absolute;left:0;top:0;width:48mm;max-width:48mm;padding:0 1mm;background:#fff;color:#000;box-sizing:border-box}
 }
 #printArea{display:none}
+.print-label{width:100%;font-family:Arial,sans-serif;color:#000;background:#fff;box-sizing:border-box}
+.print-title{font-size:10pt;font-weight:800;text-align:center;letter-spacing:.2px;margin:0 0 1.2mm;padding:0 0 .8mm;border-bottom:.2mm solid #333}
+.print-layout{display:grid;grid-template-columns:17mm minmax(0,1fr);gap:1.5mm;align-items:center;width:100%}
+.print-qr-wrap{width:17mm;display:flex;align-items:center;justify-content:center;min-width:0}
+#printQR{display:block!important;width:17mm!important;height:17mm!important;max-width:100%;margin:0!important;image-rendering:pixelated}
+.print-info{min-width:0;font-size:7pt;line-height:1.2;text-align:left;overflow-wrap:anywhere;word-break:break-word}
+.print-line{margin:0 0 .8mm}
+.print-line:last-child{margin-bottom:0}
+.print-key{font-weight:700}
 </style>
 </head>
 <body>
@@ -137,12 +148,16 @@
 </div>
 
 <div id="printArea">
-  <div class="print-label" style="text-align:center;font-family:Arial,sans-serif">
+  <div class="print-label">
     <div class="print-title">ONEPRINT SERVICE</div>
-    <div id="printCustomer" class="print-line"></div>
-    <div id="printUnit" class="print-line"></div>
-    <div id="printCode" class="print-line"></div>
-    <canvas id="printQR" width="96" height="96" style="display:block;width:24mm;height:24mm;margin:1mm auto 0"></canvas>
+    <div class="print-layout">
+      <div class="print-qr-wrap"><canvas id="printQR" width="160" height="160"></canvas></div>
+      <div class="print-info">
+        <div id="printCustomer" class="print-line"></div>
+        <div id="printUnit" class="print-line"></div>
+        <div id="printCode" class="print-line"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -209,6 +224,9 @@ window.generateRandomCode=function(){
   $("manualCode").value=`OPS-${String(d.getFullYear()).slice(-2)}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-${Math.floor(Math.random()*900+100)}`;
   generateQR();
 };
+function escapeLabelText(value){
+  return String(value).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
 window.generateQR=async function(){
   const code=$("manualCode").value.trim();
   if(!code) throw new Error("Masukkan atau buat serial/ID terlebih dahulu.");
@@ -216,13 +234,13 @@ window.generateQR=async function(){
   const unit=$("unit").value.trim();
   await Promise.all([
     new Promise((resolve,reject)=>QRCode.toCanvas($("qrcode"),code,{width:220,margin:1},err=>err?reject(err):resolve())),
-    new Promise((resolve,reject)=>QRCode.toCanvas($("printQR"),code,{width:96,margin:1},err=>err?reject(err):resolve()))
+    new Promise((resolve,reject)=>QRCode.toCanvas($("printQR"),code,{width:160,margin:2},err=>err?reject(err):resolve()))
   ]);
   $("previewCode").textContent=code;
   $("previewInfo").textContent=`${customer||"-"} · ${unit||"-"}`;
-  $("printCode").textContent=`Serial: ${code}`;
-  $("printCustomer").textContent=`Pelanggan: ${customer||"-"}`;
-  $("printUnit").textContent=`Merk/Tipe: ${unit||"-"}`;
+  $("printCode").innerHTML=`<span class="print-key">Serial:</span> ${escapeLabelText(code)}`;
+  $("printCustomer").innerHTML=`<span class="print-key">Pelanggan:</span> ${escapeLabelText(customer||"-")}`;
+  $("printUnit").innerHTML=`<span class="print-key">Merk/Tipe:</span> ${escapeLabelText(unit||"-")}`;
   return code;
 };
 window.printBrowser=async function(){
