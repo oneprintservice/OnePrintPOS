@@ -167,7 +167,7 @@
   margin:12px 0 0;
   border-radius:999px;
   background:#fff;
-  color:#ffffff;
+  color:#1d4ed8;
   border:1px solid rgba(255,255,255,.7);
   font-size:10px;
   font-weight:900;
@@ -1092,7 +1092,7 @@ th,td{
 
 /* Dashboard refinements: compact quick-search and count meter */
 .dashboard-price-panel{padding:14px}
-.dashboard-search-compact{max-width:320px;margin-bottom:8px}
+.dashboard-search-compact{max-width:460px;margin-bottom:8px}
 .dashboard-search-compact input{padding:8px 0!important;font-size:13px}
 .dashboard-search-compact>span{font-size:18px}
 .new-service-meter{display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:max-content;max-width:100%;padding:0!important;border:0!important;border-radius:0!important;background:transparent!important}
@@ -1105,4 +1105,54 @@ th,td{
 @media(max-width:560px){
   .dashboard-search-compact{max-width:100%}
   .new-service-meter-bar{width:10px;height:7px}
+}
+
+
+/* Final dashboard sizing fixes */
+.new-service-badge,
+.new-service-meter-label {
+  color: #ffffff !important;
+}
+.new-service-meter {
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  align-items: stretch !important;
+  box-sizing: border-box;
+}
+.new-service-meter-bars {
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  gap: 3px;
+}
+.new-service-meter-bar {
+  flex: 1 1 0 !important;
+  min-width: 0;
+  width: auto !important;
+}
+.new-service-meter-overflow {
+  flex: 0 0 34px;
+  box-sizing: border-box;
+}
+.dashboard-price-panel .dashboard-search-compact {
+  display: flex !important;
+  width: min(100%, 320px) !important;
+  max-width: 320px !important;
+  flex: 0 1 320px !important;
+  box-sizing: border-box;
+}
+.dashboard-price-panel .dashboard-search-compact input {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  box-sizing: border-box;
+}
+@media (max-width: 480px) {
+  .dashboard-price-panel .dashboard-search-compact {
+    width: min(100%, 280px) !important;
+    max-width: 280px !important;
+    flex-basis: 280px !important;
+  }
 }
