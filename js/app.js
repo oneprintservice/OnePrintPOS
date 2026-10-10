@@ -167,9 +167,12 @@ function renderStats() {
   view.stat("stat-selesai", s.selesai);
   const badge = $("#new-badge");
   if (badge) {
-    badge.textContent = s.baru > 0 ? `${s.baru} SERVIS BARU` : "Tidak ada servis baru";
+    const newCount = Math.max(0, Number(s.baru) || 0);
+    const scale = Math.min(newCount, 10);
+    badge.classList.add("new-service-meter");
+    badge.innerHTML = `<span class="new-service-meter-label">${newCount > 0 ? `${newCount} servis baru masuk` : "Belum ada servis baru"}</span><span class="new-service-meter-bars" role="img" aria-label="${newCount} servis baru masuk; skala 1 sampai 10, 10 berarti 10 atau lebih">${Array.from({ length: 10 }, (_, i) => `<i class="new-service-meter-bar${i < scale ? " is-filled" : ""}"></i>`).join("")}<i class="new-service-meter-overflow${newCount >= 10 ? " is-filled" : ""}">10+</i></span>`;
     badge.hidden = false;
-    badge.dataset.empty = String(s.baru === 0);
+    badge.dataset.empty = String(newCount === 0);
   }
 }
 

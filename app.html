@@ -1,5 +1,5 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b73ff"><title>OnePrint POS V2</title><link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261009-dashboard1">
+<link rel="stylesheet" href="css/app.css?v=20261010-dashboard2">
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script><script src="https://unpkg.com/html5-qrcode"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head><body>
 <div id="login-screen" hidden></div>
@@ -29,9 +29,9 @@
   <div id="dashboard-stock-list" class="dashboard-stock-list"></div>
 </section>
 
-<section class="dashboard-panel" aria-labelledby="dashboard-price-title">
+<section class="dashboard-panel dashboard-price-panel" aria-labelledby="dashboard-price-title">
   <div class="dashboard-panel-head"><div><h3 id="dashboard-price-title">Quick Search Harga Sparepart</h3><p class="muted">Cari stok, modal, dan harga jual.</p></div></div>
-  <label class="dashboard-search"><span aria-hidden="true">⌕</span><input id="dashboard-sparepart-search" type="search" placeholder="Cari nama sparepart..." autocomplete="off"><button id="dashboard-sparepart-clear" type="button" class="ghost" hidden>Hapus</button></label>
+  <label class="dashboard-search dashboard-search-compact"><span aria-hidden="true">⌕</span><input id="dashboard-sparepart-search" type="search" placeholder="Cari nama sparepart..." autocomplete="off"><button id="dashboard-sparepart-clear" type="button" class="ghost" hidden>Hapus</button></label>
   <div id="dashboard-sparepart-results" class="dashboard-sparepart-results"><p class="dashboard-empty">Ketik nama sparepart untuk melihat harga.</p></div>
 </section>
 </section>
@@ -174,4 +174,4 @@
 <div id="scanner-modal" class="modal scanner-modal"><div class="scanner-box"><div class="panel-head"><div><span class="eyebrow">SCANNER</span><h2>Scan Barcode / QR</h2></div><button id="scanner-close" class="icon-btn">×</button></div><div id="app-reader" class="app-reader"></div><p id="scanner-result" class="muted">Arahkan kamera ke barcode.</p></div></div>
 </div>
 <div id="toast" class="toast"></div><div id="modal" class="modal"><div class="modal-box"><div class="panel-head"><h2 id="modal-title">Detail</h2><button id="modal-close" class="icon-btn">×</button></div><div id="modal-body"></div></div></div>
-<script type="module" src="js/app.js?v=20261009-dashboard1"></script><div id="print-container" aria-hidden="true"></div></body></html>
+<script type="module" src="js/app.js?v=20261010-dashboard2"></script><div id="print-container" aria-hidden="true"></div></body></html>
