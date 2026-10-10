@@ -1156,3 +1156,90 @@ th,td{
     flex-basis: 280px !important;
   }
 }
+
+
+/* Dashboard polish v21.12.11 */
+#new-badge.new-service-meter {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 12px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #fff !important;
+}
+#new-badge.new-service-meter::before {
+  content: none !important;
+  display: none !important;
+}
+#new-badge .new-service-meter-label {
+  display: block;
+  margin: 0;
+  padding: 0;
+  color: #fff !important;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+#new-badge .new-service-meter-bars {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+#new-badge .new-service-meter-bar {
+  height: 9px !important;
+  border-radius: 3px !important;
+}
+#new-badge .new-service-meter-overflow {
+  height: 20px !important;
+  min-width: 42px !important;
+  flex: 0 0 42px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+}
+
+/* Sparepart search: full width, shorter height, text left and icon right */
+.dashboard-price-panel .dashboard-search-compact {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 100% !important;
+  min-height: 44px !important;
+  height: 44px !important;
+  padding: 0 12px !important;
+  box-sizing: border-box !important;
+}
+.dashboard-price-panel .dashboard-search-compact input {
+  order: 1 !important;
+  display: block !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 42px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  text-align: left !important;
+  font-size: 14px !important;
+  line-height: normal !important;
+}
+.dashboard-price-panel .dashboard-search-compact > span {
+  order: 2 !important;
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+}
+.dashboard-price-panel .dashboard-search-compact button {
+  order: 3 !important;
+}
