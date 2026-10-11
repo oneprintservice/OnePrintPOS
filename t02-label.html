@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cetak Label Unit · OnePrintPOS</title>
+<style>
+:root{color-scheme:light;--ink:#172033;--muted:#657084;--line:#dbe1e8;--accent:#155eef}
+*{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:680px;margin:0 auto;padding:20px 16px 36px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 4px 18px #1720330a}
+h1{font-size:22px;margin:0 0 5px}p{margin:5px 0;color:var(--muted)}label{display:block;font-weight:650;margin-bottom:7px}input{width:100%;height:46px;border:1px solid #cbd3df;border-radius:10px;padding:0 12px;font:inherit}
+button{height:44px;border:0;border-radius:10px;padding:0 15px;font:inherit;font-weight:650;cursor:pointer;background:#e9edf4;color:#172033}button.primary{background:var(--accent);color:white}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}.status{font-size:13px;padding:10px 12px;border-radius:9px;background:#f0f3f8;color:#344054;margin-top:12px}.status.ok{background:#e9f8ef;color:#17663a}.status.err{background:#fff0f0;color:#a12626}.preview{display:flex;justify-content:center;overflow:hidden;background:#eef1f5;border-radius:10px;padding:16px}.preview canvas{width:min(100%,384px);height:auto;image-rendering:pixelated;border:1px dashed #b7c0cd;background:white}.small{font-size:12px}.back{display:inline-block;color:var(--accent);text-decoration:none;margin-bottom:14px}
+</style>
+</head>
+<body><main>
+<a class="back" href="app.html">← Kembali ke OnePrintPOS</a>
+<h1>Cetak Label Unit · Phomemo T02</h1><p>Hubungkan printer lewat Bluetooth Chrome, lalu cetak QR berisi ID unit.</p>
+<section class="card">
+<label for="unitId">ID Unit / Barcode</label>
+<input id="unitId" autocomplete="off" placeholder="Contoh: OPS-PRN-000127">
+<div class="row" style="margin-top:12px"><button id="connect" class="primary">Hubungkan T02</button><button id="previewBtn">Buat Preview</button></div>
+<div id="status" class="status">Belum terhubung. Gunakan Chrome Android dan aktifkan Bluetooth.</div>
+</section>
+<section class="card">
+<h2 style="font-size:17px;margin:0 0 12px">Preview label (48 × 30 mm)</h2>
+<div class="preview"><canvas id="label" width="384" height="240"></canvas></div>
+<p class="small">Area cetak 384 × 240 titik. Roll continuous: printer akan mengumpan sesuai tinggi gambar.</p>
+<div class="row" style="margin-top:12px"><button id="print" class="primary" disabled>Cetak Label</button><button id="disconnect">Putuskan</button></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+const $=id=>document.getElementById(id), canvas=$('label'), ctx=canvas.getContext('2d',{willReadFrequently:true});
+let device=null, server=null, characteristic=null, connected=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function status(msg,kind=''){ $('status').textContent=msg; $('status').className='status '+kind; }
+function getId(){return $('unitId').value.trim();}
+function drawLabel(){
+ const id=getId(); if(!id){status('Isi ID unit dulu.','err');return false;}
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
+ // Build QR offscreen using qrcodejs, then draw it crisp to target canvas.
+ const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-9999px;top:0;background:#fff;padding:0';document.body.appendChild(holder);
+ new QRCode(holder,{text:id,width:176,height:176,correctLevel:QRCode.CorrectLevel.M});
+ const q=holder.querySelector('canvas')||holder.querySelector('img');
+ const draw=()=>{
+   ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
+   ctx.imageSmoothingEnabled=false;
+   ctx.drawImage(q,12,32,176,176);
+   ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='middle';
+   ctx.font='bold 17px Arial';wrapText(id,202,94,170,22);
+   ctx.font='12px Arial';ctx.fillText('ONEPRINT POS',202,160);
+   ctx.fillRect(202,178,150,2);
+   document.body.removeChild(holder);
+   status('Preview siap. Pastikan ID benar sebelum cetak.','ok');
+ };
+ if(q instanceof HTMLImageElement&&!q.complete){q.onload=draw;}else draw();
+ return true;
+}
+function wrapText(text,x,y,maxWidth,lineHeight){
+ const words=text.split(/[-\s]/);let line='',lines=[];
+ for(const word of words){const test=line?line+'-'+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test;}
+ if(line)lines.push(line);
+ const total=lines.length*lineHeight,start=y-(total-lineHeight)/2;
+ lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,x,start+i*lineHeight));
+}
+async function connect(){
+ if(!('bluetooth'in navigator)){throw new Error('Browser tidak mendukung Web Bluetooth. Gunakan Chrome Android.');}
+ status('Pilih printer Phomemo T02 pada dialog Bluetooth…');
+ device=await navigator.bluetooth.requestDevice({
+   filters:[{namePrefix:'T'},{namePrefix:'M'},{namePrefix:'Phomemo'}],
+   optionalServices:[0xff00,0xffe0,0xae30,'49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ff00-0000-1000-8000-00805f9b34fb']
+ });
+ device.addEventListener('gattserverdisconnected',()=>{connected=false;characteristic=null;$('print').disabled=true;status('Printer terputus. Hubungkan kembali.','err');});
+ server=await device.gatt.connect();
+ const services=[0xff00,0xffe0,0xae30,'49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ff00-0000-1000-8000-00805f9b34fb'];
+ let svc=null,last;
+ for(const s of services){try{svc=await server.getPrimaryService(s);break}catch(e){last=e}}
+ if(!svc)throw new Error('Service Bluetooth printer tidak ditemukan: '+(last?.message||''));
+ characteristic=await svc.getCharacteristic(0xff02);
+ connected=true;$('print').disabled=false;status('Terhubung: '+(device.name||'Phomemo T02'),'ok');
+}
+async function send(bytes){if(!connected||!characteristic)throw new Error('Printer belum terhubung.');
+ const data=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+ if(characteristic.properties.writeWithoutResponse) await characteristic.writeValueWithoutResponse(data);
+ else await characteristic.writeValue(data);
+}
+async function printLabel(){
+ if(!getId()){status('Isi ID unit terlebih dahulu.','err');return}
+ if(!drawLabel())return;
+ const {data}=ctx.getImageData(0,0,384,240);
+ const widthBytes=48, rows=240, raster=new Uint8Array(widthBytes*rows);
+ for(let y=0;y<rows;y++)for(let x=0;x<384;x++){
+   const i=(y*384+x)*4;
+   const gray=(data[i]*299+data[i+1]*587+data[i+2]*114)/1000;
+   if(gray<160)raster[y*widthBytes+(x>>3)]|=(0x80>>(x&7));
+ }
+ const btn=$('print');btn.disabled=true;
+ try{
+   status('Mengirim label ke printer…');
+   await send(new Uint8Array([0x10,0xff,0xfe,0x01]));await sleep(50);
+   await send(new Uint8Array([0x1b,0x40]));await sleep(100);
+   await send(new Uint8Array([0x1b,0x37,7,80,2]));await sleep(30);
+   await send(new Uint8Array([0x1d,0x76,0x30,0x00,widthBytes,0x00,rows&255,(rows>>8)&255]));
+   for(let i=0;i<raster.length;i+=128){await send(raster.slice(i,Math.min(i+128,raster.length)));await sleep(20);status(`Mengirim data cetak… ${Math.min(100,Math.round((i+128)/raster.length*100))}%`);}
+   await sleep(300);await send(new Uint8Array([0x1b,0x4a,8]));await sleep(500);
+   status('Perintah cetak terkirim. Periksa hasil label T02.','ok');
+ }catch(e){status('Cetak gagal: '+e.message,'err');}
+ finally{btn.disabled=!connected;}
+}
+$('connect').addEventListener('click',async()=>{const b=$('connect');b.disabled=true;try{await connect()}catch(e){status('Koneksi gagal: '+e.message,'err')}finally{b.disabled=false}});
+$('previewBtn').addEventListener('click',drawLabel);
+$('print').addEventListener('click',printLabel);
+$('disconnect').addEventListener('click',()=>{try{device?.gatt?.disconnect()}catch{}connected=false;characteristic=null;$('print').disabled=true;status('Printer diputuskan.')});
+const params=new URLSearchParams(location.search);if(params.get('unit'))$('unitId').value=params.get('unit');
+if(getId())drawLabel();
+</script>
+</body></html>

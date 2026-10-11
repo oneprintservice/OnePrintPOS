@@ -1980,3 +1980,12 @@ watchAuth({
     }
   }
 });
+
+
+// Direct thermal label printing on Android Chrome (Phomemo T02).
+document.getElementById("print-unit-label")?.addEventListener("click", () => {
+  const unitId = document.getElementById("barcode-input")?.value?.trim() || "";
+  const target = new URL("t02-label.html", window.location.href);
+  if (unitId) target.searchParams.set("unit", unitId);
+  window.location.href = target.href;
+});
