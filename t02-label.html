@@ -13,11 +13,15 @@ button{height:44px;border:0;border-radius:10px;padding:0 15px;font:inherit;font-
 </head>
 <body><main>
 <a class="back" href="app.html">← Kembali ke OnePrintPOS</a>
-<h1>Cetak Label Unit · Phomemo T02</h1><p>Hubungkan printer lewat Bluetooth Chrome, lalu cetak QR berisi ID unit.</p>
+<h1>Cetak Label Unit · Phomemo T02</h1><p>Hubungkan printer lewat Bluetooth Chrome, buat QR ID otomatis, lalu cetak label unit.</p>
 <section class="card">
 <label for="unitId">ID Unit / Barcode</label>
-<input id="unitId" autocomplete="off" placeholder="Contoh: OPS-PRN-000127">
-<div class="row" style="margin-top:12px"><button id="connect" class="primary">Hubungkan T02</button><button id="previewBtn">Buat Preview</button></div>
+<input id="unitId" autocomplete="off" placeholder="ID unit atau buat ID waktu">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+ <label>Info pelanggan<input id="customerInfo" placeholder="Nama pelanggan"></label>
+ <label>Tipe unit<input id="unitType" placeholder="Epson L3210"></label>
+</div>
+<div class="row" style="margin-top:12px"><button id="generateId">Buat ID waktu</button><button id="connect" class="primary">Hubungkan T02</button><button id="previewBtn">Buat Preview</button></div>
 <div id="status" class="status">Belum terhubung. Gunakan Chrome Android dan aktifkan Bluetooth.</div>
 </section>
 <section class="card">
@@ -34,6 +38,11 @@ let device=null, server=null, characteristic=null, connected=false;
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function status(msg,kind=''){ $('status').textContent=msg; $('status').className='status '+kind; }
 function getId(){return $('unitId').value.trim();}
+function makeTimestampId(){
+ const d=new Date(), p=n=>String(n).padStart(2,'0');
+ return p(d.getDate())+p(d.getMonth()+1)+String(d.getFullYear()).slice(-2)+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());
+}
+$('generateId').addEventListener('click',()=>{$('unitId').value=makeTimestampId();drawLabel();});
 function drawLabel(){
  const id=getId(); if(!id){status('Isi ID unit dulu.','err');return false;}
  ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
@@ -44,11 +53,17 @@ function drawLabel(){
  const draw=()=>{
    ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
    ctx.imageSmoothingEnabled=false;
-   ctx.drawImage(q,12,8,176,176);
+   // QR 15 mm (120 titik), ditempatkan dekat tepi atas untuk memudahkan sobek.
+   ctx.drawImage(q,4,12,120,120);
    ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='top';
-   ctx.font='bold 17px Arial';wrapText(id,202,12,170,22);
-   ctx.font='12px Arial';ctx.fillText('ONEPRINT POS',202,150);
-   ctx.fillRect(202,168,150,2);
+   ctx.font='bold 15px Arial';wrapText(id,134,4,240,18);
+   const customer=$('customerInfo').value.trim();
+   const type=$('unitType').value.trim();
+   ctx.font='12px Arial';
+   let y=30;
+   if(customer){wrapText('Pelanggan: '+customer,134,y,240,15);y+=30;}
+   if(type){wrapText('Tipe: '+type,134,y,240,15);y+=30;}
+   ctx.font='bold 11px Arial';ctx.fillText('OnePrint Service',134,210);
    document.body.removeChild(holder);
    status('Preview siap. Pastikan ID benar sebelum cetak.','ok');
  };
@@ -56,11 +71,10 @@ function drawLabel(){
  return true;
 }
 function wrapText(text,x,y,maxWidth,lineHeight){
- const words=text.split(/[-\s]/);let line='',lines=[];
- for(const word of words){const test=line?line+'-'+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test;}
+ const words=String(text).split(/\\s+/);let line='',lines=[];
+ for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test;}
  if(line)lines.push(line);
- const start=y;
- lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,x,start+i*lineHeight));
+ lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight));
 }
 async function connect(){
  if(!('bluetooth'in navigator)){throw new Error('Browser tidak mendukung Web Bluetooth. Gunakan Chrome Android.');}
@@ -101,7 +115,7 @@ async function printLabel(){
    await send(new Uint8Array([0x1b,0x37,7,80,2]));await sleep(30);
    await send(new Uint8Array([0x1d,0x76,0x30,0x00,widthBytes,0x00,rows&255,(rows>>8)&255]));
    for(let i=0;i<raster.length;i+=128){await send(raster.slice(i,Math.min(i+128,raster.length)));await sleep(20);status(`Mengirim data cetak… ${Math.min(100,Math.round((i+128)/raster.length*100))}%`);}
-   await sleep(300);await send(new Uint8Array([0x1b,0x4a,8]));await sleep(500);
+   await sleep(300);await send(new Uint8Array([0x1b,0x4a,0]));await sleep(500);
    status('Perintah cetak terkirim. Periksa hasil label T02.','ok');
  }catch(e){status('Cetak gagal: '+e.message,'err');}
  finally{btn.disabled=!connected;}
@@ -110,7 +124,10 @@ $('connect').addEventListener('click',async()=>{const b=$('connect');b.disabled=
 $('previewBtn').addEventListener('click',drawLabel);
 $('print').addEventListener('click',printLabel);
 $('disconnect').addEventListener('click',()=>{try{device?.gatt?.disconnect()}catch{}connected=false;characteristic=null;$('print').disabled=true;status('Printer diputuskan.')});
-const params=new URLSearchParams(location.search);if(params.get('unit'))$('unitId').value=params.get('unit');
+const params=new URLSearchParams(location.search);
+if(params.get('unit'))$('unitId').value=params.get('unit');
+if(params.get('customer'))$('customerInfo').value=params.get('customer');
+if(params.get('type'))$('unitType').value=params.get('type');
 if(getId())drawLabel();
 </script>
 </body></html>

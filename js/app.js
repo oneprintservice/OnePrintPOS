@@ -1182,9 +1182,9 @@ function serviceCard(x) {
 
 function showMoreMenu() {
   view.modal("Menu Lainnya", `<div class="more-grid">
-    <button data-page="tools"><b>Tools</b><span>Scanner QR, PLN, Internet, website publik</span></button>
+    <button data-page="tools"><b>Tools</b><span>Cetak Label Unit, PLN, Internet, website publik</span></button>
     <a href="tracking.html"><b>Tracking Publik</b><span>Lihat halaman tracking pelanggan</span></a>
-    <a href="scanner.html"><b>Generator QR</b><span>Tool QR lama tetap tersedia</span></a>
+    <a href="t02-label.html"><b>Cetak Label Unit</b><span>Hubungkan T02 dan buat QR unit</span></a>
   </div>`);
 }
 
@@ -1436,10 +1436,11 @@ function bind() {
       return;
     }
 
-    if (e.target.closest("#new-service") || e.target.closest("#new-service-3")) {
+    if (e.target.closest("#new-service")) {
       resetServiceForm(); switchPage("kasir"); return;
     }
 
+    if (e.target.closest("#reset-service-fields")) { resetServiceForm(); return; }
     if (e.target.closest("#more-menu")) { showMoreMenu(); return; }
     if (e.target.closest("#modal-close")) { view.closeModal(); return; }
     if (e.target.closest("#scanner-close")) { await stopCodeScanner(); return; }
@@ -1985,7 +1986,11 @@ watchAuth({
 // Direct thermal label printing on Android Chrome (Phomemo T02).
 document.getElementById("print-unit-label")?.addEventListener("click", () => {
   const unitId = document.getElementById("barcode-input")?.value?.trim() || "";
+  const customer = document.getElementById("input-nama")?.value?.trim() || "";
+  const type = document.getElementById("input-merk")?.value?.trim() || "";
   const target = new URL("t02-label.html", window.location.href);
   if (unitId) target.searchParams.set("unit", unitId);
+  if (customer) target.searchParams.set("customer", customer);
+  if (type) target.searchParams.set("type", type);
   window.location.href = target.href;
 });
