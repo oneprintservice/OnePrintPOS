@@ -1317,3 +1317,19 @@ th,td{
   margin: 0 !important;
   text-align: center !important;
 }
+
+/* Hilangkan kotak dan shadow counter servis baru */
+.new-service-badge {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  border-radius: 0 !important;
+}
+
+/* Hilangkan lapisan dekoratif jika berasal dari pseudo-element */
+.new-service-badge::before,
+.new-service-badge::after {
+  content: none !important;
+  display: none !important;
+}
