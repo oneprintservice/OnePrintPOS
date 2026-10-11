@@ -44,11 +44,11 @@ function drawLabel(){
  const draw=()=>{
    ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
    ctx.imageSmoothingEnabled=false;
-   ctx.drawImage(q,12,32,176,176);
-   ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='middle';
-   ctx.font='bold 17px Arial';wrapText(id,202,94,170,22);
-   ctx.font='12px Arial';ctx.fillText('ONEPRINT POS',202,160);
-   ctx.fillRect(202,178,150,2);
+   ctx.drawImage(q,12,8,176,176);
+   ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='top';
+   ctx.font='bold 17px Arial';wrapText(id,202,12,170,22);
+   ctx.font='12px Arial';ctx.fillText('ONEPRINT POS',202,150);
+   ctx.fillRect(202,168,150,2);
    document.body.removeChild(holder);
    status('Preview siap. Pastikan ID benar sebelum cetak.','ok');
  };
@@ -59,7 +59,7 @@ function wrapText(text,x,y,maxWidth,lineHeight){
  const words=text.split(/[-\s]/);let line='',lines=[];
  for(const word of words){const test=line?line+'-'+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test;}
  if(line)lines.push(line);
- const total=lines.length*lineHeight,start=y-(total-lineHeight)/2;
+ const start=y;
  lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,x,start+i*lineHeight));
 }
 async function connect(){
