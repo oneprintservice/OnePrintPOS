@@ -1,5 +1,5 @@
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b73ff"><title>OnePrint POS V2</title><link rel="icon" href="assets/logos.png">
-<link rel="stylesheet" href="css/app.css?v=20261007-ui-cleanup">
+<link rel="stylesheet" href="css/app.css?v=20261011-t02-label-v2">
 <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script><script src="https://unpkg.com/html5-qrcode"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head><body>
 <div id="login-screen" hidden></div>
@@ -7,17 +7,42 @@
 <aside class="sidebar"><div class="side-brand"><img src="assets/logos.png"><div><b>ONEPRINT</b><small>POS SYSTEM</small></div></div>
 <nav><button data-page="dashboard" class="active"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Dashboard</span></button><button data-page="kasir"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Kasir & Servis</span></button><button data-page="services"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v4H7z"/><path d="M5 5H4v16h16V5h-1"/><path d="M8 11h8M8 15h6"/></svg><span>Data Servis</span></button><button data-page="inventory"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 7 9-4 9 4-9 4-9-4Z"/><path d="m3 12 9 4 9-4M3 17l9 4 9-4"/></svg><span>Inventori</span></button><button data-page="restock"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/><rect x="4" y="4" width="16" height="16" rx="3"/></svg><span>Restock</span></button><button data-page="accounting"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/><path d="M3 20h18"/></svg><span>Akuntansi</span></button><button data-page="tools"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17a2.1 2.1 0 0 0 3 3l5.3-5.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2-2 2.3-2.3Z"/></svg><span>Tools</span></button></nav>
 <div class="side-bottom"><div class="user-chip"><div class="avatar" id="user-avatar">OP</div><div><b id="user-name">TEKNISI</b><small id="idle-label">Sedang login</small></div></div><button id="logout" class="logout">↪ Keluar</button></div></aside>
-<main class="main"><header class="topbar"><div class="topbar-left"><button id="menu-toggle" class="menu-toggle" aria-label="Buka menu" aria-expanded="false"><i></i><i></i><i></i></button><div><small class="eyebrow">ONEPRINT POS</small><h1 id="page-title">Dashboard</h1></div></div><button id="new-service" class="primary">＋ Transaksi Baru</button></header>
+<main class="main"><header class="topbar"><div class="topbar-left"><button id="menu-toggle" class="menu-toggle" aria-label="Buka menu" aria-expanded="false"><i></i><i></i><i></i></button><div><small class="eyebrow">ONEPRINT POS</small><h1 id="page-title">Dashboard</h1></div></div></header>
 <section id="page-dashboard" class="page active">
 <div class="welcome"><div><span class="eyebrow">OPERASIONAL HARI INI</span><h2>Ringkas, cepat, terkontrol.</h2>
 <div class="new-service-badge" id="new-badge" hidden>0 servis baru</div><p>Servis, stok, dan transaksi.</p></div><button class="ghost" data-page="services">Lihat semua servis →</button></div>
 <div class="stats-grid"><button id="dashboard-aktif" class="stat-card"><span>Servis Aktif</span><b id="stat-aktif">0</b><small>Dalam proses</small></button><button id="dashboard-sparepart" class="stat-card"><span>Menunggu Sparepart</span><b id="stat-sparepart">0</b><small>Perlu tindakan</small></button><button id="dashboard-selesai" class="stat-card"><span>Selesai</span><b id="stat-selesai">0</b><small>Siap diambil</small></button><div class="stat-card"><span>Total Servis</span><b id="stat-total">0</b><small>Semua data</small></div></div>
-<div class="section-head"><div><h3>Alur kerja</h3><p class="muted">Akses cepat.</p></div></div><div class="quick-grid"><button data-page="kasir"><b>＋ Terima Servis</b><span>Buat tanda terima</span></button><button data-page="services"><b>⌕ Cari Servis</b><span>Cari & edit</span></button><button id="scan-printer"><b>▣ Scan Unit</b><span>Identifikasi unit</span></button><button data-page="inventory"><b>▤ Kelola Inventori</b><span>Stok & harga</span></button><a href="scanner.html"><b>⌁ Scanner QR</b><span>Scan & buat QR</span></a></div>
+<div class="section-head"><div><h3>Akses cepat</h3><p class="muted">Pindai unit atau QR.</p></div></div>
+<div class="dashboard-scan-grid">
+  <button id="scan-printer" class="dashboard-scan-card"><span class="dashboard-scan-icon">▣</span><span><b>Scan Unit</b><small>Identifikasi unit & riwayat servis</small></span><span class="dashboard-card-arrow">→</span></button>
+  <a href="t02-label.html" class="dashboard-scan-card"><span class="dashboard-scan-icon">▤</span><span><b>Cetak Label Unit</b><small>Buat QR dan cetak label T02</small></span><span class="dashboard-card-arrow">→</span></a>
+</div>
+
+<section class="dashboard-panel" aria-labelledby="dashboard-income-title">
+  <div class="dashboard-panel-head"><div><h3 id="dashboard-income-title">Pendapatan Bulan Ini</h3><p class="muted" id="dashboard-income-period">Ringkasan per tanggal</p></div><strong id="dashboard-income-total">Rp 0</strong></div>
+  <div id="dashboard-income-chart" class="dashboard-income-chart" role="img" aria-label="Grafik pendapatan harian bulan berjalan"></div>
+</section>
+
+<section class="dashboard-panel" aria-labelledby="dashboard-stock-title">
+  <div class="dashboard-panel-head"><div><h3 id="dashboard-stock-title">Peringatan Stok Habis</h3><p class="muted">Hanya barang dengan stok nol.</p></div><span id="dashboard-stock-count" class="dashboard-count">0 barang</span></div>
+  <div id="dashboard-stock-empty" class="dashboard-empty">Tidak ada stok yang habis.</div>
+  <div id="dashboard-stock-list" class="dashboard-stock-list"></div>
+</section>
+
+<section class="dashboard-panel dashboard-price-panel" aria-labelledby="dashboard-price-title">
+  <div class="dashboard-panel-head"><div><h3 id="dashboard-price-title">Quick Search Harga Sparepart</h3><p class="muted">Cari stok, modal, dan harga jual.</p></div></div>
+  <label class="dashboard-search dashboard-search-compact">
+    <input id="dashboard-sparepart-search" type="text" placeholder="Cari nama sparepart..." autocomplete="off" aria-label="Cari nama sparepart">
+    <button id="dashboard-sparepart-clear" type="button" class="dashboard-search-clear" aria-label="Hapus pencarian" title="Hapus pencarian" hidden>×</button>
+    <span class="dashboard-search-icon" aria-hidden="true">⌕</span>
+  </label>
+  <div id="dashboard-sparepart-results" class="dashboard-sparepart-results"><p class="dashboard-empty">Ketik nama sparepart untuk melihat harga.</p></div>
+</section>
 </section>
 <section id="page-kasir" class="page"><div class="page-grid">
 <div class="panel"><div class="panel-head"><div><span class="eyebrow">FORM SERVIS</span><h2 id="service-mode">Transaksi Baru</h2></div><button id="delete-service" class="danger-link" hidden>Hapus</button></div>
-<div class="scan-strip"><input id="service-code-input" placeholder="Cari No TT / Invoice / kode servis"><button id="find-service-code" class="ghost">Buka</button></div><div class="form-grid"><label>Nama pelanggan<input id="input-nama" placeholder="Nama lengkap"></label><label>No. telepon<input id="input-telp" placeholder="08xx..."></label><label>Merk / Tipe<input id="input-merk" placeholder="Epson L3210"></label><label>ID / Barcode Unit<div class="input-action"><input id="barcode-input" placeholder="Scan barcode/QR untuk identitas unit" autocomplete="off" inputmode="text"><button id="scan-serial" class="scan-printer-btn" type="button" title="Buka kamera untuk scan barcode printer" aria-label="Scan barcode printer">▣ <span>Scan</span></button></div></label><label class="span-2">Kelengkapan<input id="input-kelengkapan" placeholder="Unit, adaptor, kabel, dll."></label><div id="printer-context" class="printer-context span-2" hidden></div><label class="span-2">Keluhan<textarea id="input-keluhan" rows="3" placeholder="Keluhan pelanggan..."></textarea></label><label>Status<select id="status-servis"><option>MASUK</option><option>DIAGNOSA</option><option>DIKERJAKAN</option><option>MENUNGGU SPAREPART</option><option>SELESAI</option><option>CANCEL</option><option>DIAMBIL</option></select></label><label>Keterangan<input id="keterangan-servis" placeholder="Catatan teknisi"></label></div></div>
-<div class="panel cart-panel"><div class="panel-head"><div><span class="eyebrow">ITEM TRANSAKSI</span><h2>Jasa & Sparepart</h2></div></div><div class="tabs"><button id="tab-jasa" class="active">Jasa</button><button id="tab-sparepart">Sparepart</button></div><div class="item-entry"><div class="suggest-wrap"><input id="input-item-nama" placeholder="Cari jasa / barang..."><div id="suggestions" class="suggestions" hidden></div></div><input id="input-item-qty" class="item-qty-input" type="number" min="1" step="1" value="1" inputmode="numeric" placeholder="Qty"><input id="input-item-harga" type="number" placeholder="Harga"><button id="add-item" class="primary">Tambah</button></div><div id="cart" class="cart"></div><div class="total-row"><span>Total</span><b id="total">Rp 0</b></div><div class="actions"><button id="save-service" class="secondary">Simpan</button><button id="save-print-note" class="secondary">Simpan + Tanda Terima</button><button id="save-print-invoice" class="primary">Simpan + Invoice</button><button id="reprint-note" class="ghost">Cetak Ulang Tanda Terima</button><button id="reprint-invoice" class="ghost">Cetak Ulang Invoice</button></div><button id="new-service-3" class="ghost wide">＋ Transaksi Baru</button></div>
+<div class="scan-strip"><input id="service-code-input" placeholder="Cari No TT / Invoice / kode servis"><button id="find-service-code" class="ghost">Buka</button></div><div class="form-grid"><label>Nama pelanggan<input id="input-nama" placeholder="Nama lengkap"></label><label>No. telepon<input id="input-telp" placeholder="08xx..."></label><label>Merk / Tipe<input id="input-merk" placeholder="Epson L3210"></label><label>ID / Barcode Unit<div class="input-action"><input id="barcode-input" placeholder="Scan barcode/QR untuk identitas unit" autocomplete="off" inputmode="text"><button id="scan-serial" class="scan-printer-btn" type="button" title="Buka kamera untuk scan barcode printer" aria-label="Scan barcode printer">▣ <span>Scan</span></button></div><button id="print-unit-label" type="button" class="ghost wide" style="margin-top:8px">▤ Cetak Label Unit (T02)</button></label><label class="span-2">Kelengkapan<input id="input-kelengkapan" placeholder="Unit, adaptor, kabel, dll."></label><div id="printer-context" class="printer-context span-2" hidden></div><label class="span-2">Keluhan<textarea id="input-keluhan" rows="3" placeholder="Keluhan pelanggan..."></textarea></label><label>Status<select id="status-servis"><option>MASUK</option><option>DIAGNOSA</option><option>DIKERJAKAN</option><option>MENUNGGU SPAREPART</option><option>SELESAI</option><option>CANCEL</option><option>DIAMBIL</option></select></label><label>Keterangan<input id="keterangan-servis" placeholder="Catatan teknisi"></label></div></div>
+<div class="panel cart-panel"><div class="panel-head"><div><span class="eyebrow">ITEM TRANSAKSI</span><h2>Jasa & Sparepart</h2></div></div><div class="tabs"><button id="tab-jasa" class="active">Jasa</button><button id="tab-sparepart">Sparepart</button></div><div class="item-entry"><div class="suggest-wrap"><input id="input-item-nama" placeholder="Cari jasa / barang..."><div id="suggestions" class="suggestions" hidden></div></div><input id="input-item-qty" class="item-qty-input" type="number" min="1" step="1" value="1" inputmode="numeric" placeholder="Qty"><input id="input-item-harga" type="number" placeholder="Harga"><button id="add-item" class="primary">Tambah</button></div><div id="cart" class="cart"></div><div class="total-row"><span>Total</span><b id="total">Rp 0</b></div><div class="actions"><button id="save-service" class="secondary">Simpan</button><button id="save-print-note" class="secondary">Simpan + Tanda Terima</button><button id="save-print-invoice" class="primary">Simpan + Invoice</button><button id="reprint-note" class="ghost">Cetak Ulang Tanda Terima</button><button id="reprint-invoice" class="ghost">Cetak Ulang Invoice</button></div><button id="reset-service-fields" class="ghost wide" type="button">↺ Reset Field</button></div>
 </div></section>
 <section id="page-services" class="page"><div class="panel"><div class="panel-head"><div><span class="eyebrow">DATABASE SERVIS</span><h2>Servis</h2></div><div><span id="service-count" class="count-pill">0 tampil</span><button data-page="kasir" class="primary">＋ Baru</button></div></div><div class="toolbar"><input id="service-search" placeholder="Cari nomor, pelanggan, merk, serial..."><select id="service-status-filter"><option value="">Semua status</option><option>MASUK</option><option>DIAGNOSA</option><option>DIKERJAKAN</option><option>MENUNGGU SPAREPART</option><option>SELESAI</option><option>CANCEL</option><option>DIAMBIL</option></select><button id="scan-service-list" class="secondary">▣ Scan</button></div><div class="table-wrap><table><thead><tr><th>Nomor</th><th>Pelanggan</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody id="service-list"></tbody></table></div></div></section>
 <section id="page-inventory" class="page"><div class="inventory-layout"><div class="panel"><div class="panel-head"><div><span class="eyebrow">MASTER BARANG</span><h2>Inventori</h2></div></div><div class="form-grid">
@@ -26,6 +51,7 @@
 <label>Satuan stok dasar<select id="inv-satuan"><option>pcs</option><option>ml</option><option>gram</option><option>unit</option></select></label>
 <label>Harga beli / kemasan<input id="inv-beli" type="number" min="0" placeholder="160000"></label>
 <label>Harga jual / unit jual<input id="inv-jual" type="number" min="0" placeholder="30000"></label>
+<label>Target margin (%)<input id="inv-target-margin" type="number" min="0" max="90" step="0.5" placeholder="Otomatis dari margin historis"><small class="field-help">Awalnya mengikuti margin historis; isi manual jika ingin target berbeda.</small></label>
 <label>Stok dasar<input id="inv-stok" type="number" min="0" placeholder="1000"></label>
 <label id="inv-pack-size-label">Isi kemasan beli<input id="inv-pack-size" type="number" min="1" value="1" placeholder="1000"></label>
 <label id="inv-sell-size-label">Isi per penjualan<input id="inv-sell-size" type="number" min="1" value="1" placeholder="100"></label>
@@ -56,51 +82,8 @@
 <div class="page-grid accounting-grid"><div class="panel"><div class="panel-head"><div><span class="eyebrow">CATAT MANUAL</span><h2>Transaksi Lain</h2></div></div><div class="form-grid"><label>Tipe<select id="ledger-type"><option>PEMASUKAN</option><option>PENGELUARAN</option></select></label><label>Kategori<select id="ledger-category"><option>OPERASIONAL</option><option>GAJI</option><option>SEWA</option><option>LAINNYA</option></select></label><label>Tanggal<input id="ledger-date" type="date"></label><label>Jumlah<input id="ledger-amount" type="number" min="0"></label><label class="span-2">Keterangan<input id="ledger-note" placeholder="Contoh: listrik, ongkir, pendapatan lain"></label></div><div class="manual-ledger-actions"><button type="button" id="save-manual-ledger" class="primary wide">Catat Transaksi</button><button type="button" id="cancel-manual-ledger" class="secondary wide" hidden>Batal Edit</button></div></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">BUKU KAS</span><h2>Transaksi Bulan Ini</h2></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Keterangan</th><th>Jumlah</th><th></th></tr></thead><tbody id="ledger-list"></tbody></table></div></div></div></section>
 <section id="page-tools" class="page">
 <div class="quick-grid">
-  <a href="scanner.html"><b>⌁ Scanner QR</b><span>Scan kode servis dan buat QR</span></a>
   <a href="pln.html"><b>⚡ Cetak PLN</b><span>Template PLN</span></a>
   <a href="internet.html"><b>◉ Cetak Internet</b><span>Template Internet</span></a>
-  <button type="button" id="open-maintenance" class="tool-card"><b>⌫ Pemeliharaan Data</b><span>Backup & bersihkan data lama</span></button>
-</div>
-
-<div class="panel printer-settings-panel">
-  <div class="panel-head">
-    <div><span class="eyebrow">HARDWARE</span><h2>Printer</h2></div>
-    <span id="printer-bridge-status" class="count-pill">Belum dicek</span>
-  </div>
-  <p class="muted">MX Linux menangani LaserJet A5 dan thermal. CUPS untuk antrian, Bridge untuk thermal.</p>
-
-  <div class="printer-profile-grid">
-    <div class="printer-profile-card">
-      <div class="profile-kicker">DOKUMEN</div>
-      <h3>Nota / Tanda Terima</h3>
-      <p class="muted">Nota/TT tetap A5. Printer memakai antrian CUPS.</p>
-      <div class="form-grid">
-        <label>Printer dokumen<select id="printer-document-transport"><option value="cups">Linux / CUPS</option><option value="winspool">Windows / Spooler</option></select></label>
-        <label>Ukuran kertas<select id="printer-document-paper"><option value="A5">A5</option></select></label>
-        <label class="span-2">Nama antrian printer<input id="printer-document-name" placeholder="Contoh: LaserJet_A5"></label>
-      </div>
-      <small class="muted">Target dokumen. Cetak browser tetap tersedia.</small>
-    </div>
-
-    <div class="printer-profile-card">
-      <div class="profile-kicker">LABEL THERMAL</div>
-      <h3>Printer Label</h3>
-      <p class="muted">Untuk label, QR, dan barcode. Terpisah dari LaserJet.</p>
-      <div class="form-grid">
-        <label>Mode label<select id="printer-mode"><option value="browser">Browser / dialog cetak</option><option value="bridge">Thermal via Bridge</option></select></label>
-        <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS (USB)</option><option value="winspool">Windows / Spooler (USB)</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Serial / Bluetooth (COM / TTY)</option></select></label>
-        <label class="span-2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181" placeholder="http://192.168.1.10:18181"></label>
-        <label id="printer-name-wrap"><span id="printer-name-label">Nama antrian CUPS</span><input id="printer-name" placeholder="Thermal_Label"></label>
-        <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
-        <label id="printer-port-wrap" hidden>Port<input id="printer-port" type="number" value="9100"></label>
-        <label id="printer-serial-wrap" hidden>Port Serial / Bluetooth<input id="printer-serial" placeholder="COM3 atau /dev/ttyUSB0"></label>
-        <label id="printer-baud-wrap" hidden>Baud rate<input id="printer-baud" type="number" value="9600"></label>
-        <label>Lebar kertas<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
-        <label>Token bridge (opsional)<input id="printer-token" type="password" placeholder="Jika bridge diberi token"></label>
-      </div>
-      <div class="printer-settings-actions"><button id="printer-save" class="primary">Simpan Setting</button><button id="printer-test" class="secondary">Tes Bridge</button><button id="printer-test-print" class="ghost">Cetak Tes Thermal</button></div>
-    </div>
-  </div>
 </div>
 
 <div class="panel maintenance-panel">
@@ -152,4 +135,4 @@
 <div id="scanner-modal" class="modal scanner-modal"><div class="scanner-box"><div class="panel-head"><div><span class="eyebrow">SCANNER</span><h2>Scan Barcode / QR</h2></div><button id="scanner-close" class="icon-btn">×</button></div><div id="app-reader" class="app-reader"></div><p id="scanner-result" class="muted">Arahkan kamera ke barcode.</p></div></div>
 </div>
 <div id="toast" class="toast"></div><div id="modal" class="modal"><div class="modal-box"><div class="panel-head"><h2 id="modal-title">Detail</h2><button id="modal-close" class="icon-btn">×</button></div><div id="modal-body"></div></div></div>
-<script type="module" src="js/app.js?v=20261007-ui-cleanup"></script><div id="print-container" aria-hidden="true"></div></body></html>
+<script type="module" src="js/app.js?v=20261011-t02"></script><div id="print-container" aria-hidden="true"></div></body></html>

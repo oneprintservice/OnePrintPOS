@@ -1,6 +1,6 @@
 import { auth } from "./core/firebase.js";
 import { watchAuth, signOut, startIdleTimeout } from "./core/auth.js";
-import { listInventory, saveInventory, removeInventory, changeStock } from "./features/inventory.js";
+import { listInventory, saveInventory, removeInventory, changeStock, applyPriceRecommendation, declinePriceRecommendation } from "./features/inventory.js?v=20261009-margin2";
 import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
   listServices, getService, findServiceByCode, saveService, removeService,
@@ -9,7 +9,7 @@ import {
 import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
 import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
 import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
-import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261005-premium2";
+import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261009-margin2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
@@ -152,6 +152,7 @@ async function loadAll() {
   console.info(`OnePrint: ${state.services.length} data servis, ${state.inventory.length} inventori`);
   renderInventory();
   renderStats();
+  renderDashboard();
   renderServiceTable();
   renderRestock();
   renderAccounting();
@@ -166,10 +167,135 @@ function renderStats() {
   view.stat("stat-selesai", s.selesai);
   const badge = $("#new-badge");
   if (badge) {
-    badge.textContent = s.baru > 0 ? `${s.baru} SERVIS BARU` : "Tidak ada servis baru";
+    const newCount = Math.max(0, Number(s.baru) || 0);
+    const scale = Math.min(newCount, 10);
+    badge.classList.add("new-service-meter");
+    badge.innerHTML = `<span class="new-service-meter-label">${newCount > 0 ? `${newCount} servis baru masuk` : "Belum ada servis baru"}</span><span class="new-service-meter-bars" role="img" aria-label="${newCount} servis baru masuk; skala 1 sampai 10, 10 berarti 10 atau lebih">${Array.from({ length: 10 }, (_, i) => `<i class="new-service-meter-bar${i < scale ? " is-filled" : ""}"></i>`).join("")}<i class="new-service-meter-overflow${newCount >= 10 ? " is-filled" : ""}">10+</i></span>`;
     badge.hidden = false;
-    badge.dataset.empty = String(s.baru === 0);
+    badge.dataset.empty = String(newCount === 0);
   }
+}
+
+
+function renderDashboard() {
+  renderDashboardIncome();
+  renderDashboardOutOfStock();
+  renderDashboardSparepartSearch();
+}
+
+function renderDashboardIncome() {
+  const chart = $("#dashboard-income-chart");
+  const totalEl = $("#dashboard-income-total");
+  const periodEl = $("#dashboard-income-period");
+  if (!chart || !totalEl) return;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const days = new Date(year, month + 1, 0).getDate();
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+  const daily = Array.from({ length: days }, (_, i) => ({
+    day: i + 1,
+    date: `${monthKey}-${String(i + 1).padStart(2, "0")}`,
+    amount: 0
+  }));
+  const byDate = new Map(daily.map(row => [row.date, row]));
+
+  // Follow accounting rules: service income is recognized at DIAMBIL,
+  // while non-service ledger income uses its transaction date.
+  state.ledger.forEach(item => {
+    if (String(item.sumber || "").toUpperCase() === "SERVIS") return;
+    if (String(item.tipe || "").toUpperCase() !== "PEMASUKAN") return;
+    const date = ledgerDate(item.tanggal);
+    if (!date || localMonthInput(date) !== monthKey) return;
+    const bucket = byDate.get(localDateInput(date));
+    if (bucket) bucket.amount += Math.max(0, Number(item.jumlah) || 0);
+  });
+
+  state.services.forEach(service => {
+    if (statusOf(service) !== "DIAMBIL") return;
+    const date = accountingDateForService(service);
+    if (!date || localMonthInput(date) !== monthKey) return;
+    const bucket = byDate.get(localDateInput(date));
+    if (bucket) bucket.amount += Math.max(0, Number(service.total) || 0);
+  });
+
+  const total = daily.reduce((sum, row) => sum + row.amount, 0);
+  totalEl.textContent = money(total);
+  if (periodEl) periodEl.textContent = now.toLocaleDateString("id-ID", { month: "long", year: "numeric" });
+
+  const max = Math.max(1, ...daily.map(row => row.amount));
+  const width = 930, height = 210;
+  const pad = { top: 16, right: 8, bottom: 31, left: 8 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const slot = plotW / days;
+  const barW = Math.max(2, Math.min(18, slot * 0.66));
+  const bars = daily.map(row => {
+    const h = row.amount > 0 ? Math.max(2, (row.amount / max) * plotH) : 1;
+    const x = pad.left + (row.day - 1) * slot + (slot - barW) / 2;
+    const y = pad.top + plotH - h;
+    const labelX = pad.left + (row.day - 0.5) * slot;
+    return `<g><title>Tanggal ${row.day}: ${money(row.amount)}</title><rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${h.toFixed(2)}" rx="2" class="dashboard-income-bar"${row.amount === 0 ? ' opacity=".22"' : ""}/><text x="${labelX.toFixed(2)}" y="${height - 9}" text-anchor="middle" class="dashboard-income-day">${row.day}</text></g>`;
+  }).join("");
+  chart.innerHTML = `<svg class="dashboard-income-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-label="Pendapatan dari tanggal 1 sampai ${days}">
+    <line x1="${pad.left}" y1="${pad.top + plotH}" x2="${width - pad.right}" y2="${pad.top + plotH}" class="dashboard-income-baseline"/>
+    ${bars}
+  </svg><div class="dashboard-chart-foot"><span>1</span><span>${days} ${now.toLocaleDateString("id-ID", { month: "short" })}</span></div>`;
+}
+
+function renderDashboardOutOfStock() {
+  const list = $("#dashboard-stock-list");
+  const empty = $("#dashboard-stock-empty");
+  const count = $("#dashboard-stock-count");
+  if (!list || !empty || !count) return;
+  const rows = state.inventory.filter(item => Number(item.stok || 0) === 0);
+  count.textContent = `${rows.length} barang`;
+  empty.hidden = rows.length > 0;
+  list.innerHTML = rows.map(item => `
+    <div class="dashboard-stock-item">
+      <span class="dashboard-stock-dot" aria-hidden="true"></span>
+      <span class="dashboard-stock-name"><strong>${escapeHtml(item.nama || "Tanpa nama")}</strong><small>${escapeHtml(item.kategori || "inventori")} · ${escapeHtml(item.satuan || "pcs")}</small></span>
+      <span class="dashboard-stock-zero">Habis</span>
+    </div>`).join("");
+}
+
+function renderDashboardSparepartSearch() {
+  const input = $("#dashboard-sparepart-search");
+  const results = $("#dashboard-sparepart-results");
+  const clear = $("#dashboard-sparepart-clear");
+  if (!input || !results) return;
+  const query = input.value.trim().toLowerCase();
+  if (clear) clear.hidden = !query;
+  if (!query) {
+    results.innerHTML = `<p class="dashboard-empty">Ketik nama sparepart untuk melihat harga.</p>`;
+    return;
+  }
+  const rows = state.inventory
+    .filter(item => String(item.kategori || "").toLowerCase() === "sparepart")
+    .filter(item => String(item.nama || "").toLowerCase().includes(query))
+    .slice(0, 12);
+  if (!rows.length) {
+    results.innerHTML = `<p class="dashboard-empty">Sparepart tidak ditemukan.</p>`;
+    return;
+  }
+  results.innerHTML = rows.map(item => {
+    const unit = String(item.satuan || "pcs").toLowerCase();
+    const liquid = unit === "ml" || unit === "gram";
+    const packSize = liquid ? Math.max(1, Number(item.isi_kemasan_beli) || 1000) : 1;
+    const sellSize = liquid ? Math.max(1, Number(item.isi_jual) || 100) : 1;
+    const hppBase = Number(item.hpp_rata_rata_per_dasar);
+    const hppPerBase = Number.isFinite(hppBase) && hppBase > 0
+      ? hppBase : (Number(item.harga_beli || 0) / packSize);
+    const modal = hppPerBase * sellSize;
+    return `<article class="dashboard-price-result">
+      <div class="dashboard-price-result-head"><strong>${escapeHtml(item.nama)}</strong><span class="dashboard-stock-pill ${Number(item.stok || 0) === 0 ? "out" : ""}">Stok ${Number(item.stok || 0).toLocaleString("id-ID")} ${escapeHtml(item.satuan || "pcs")}</span></div>
+      <div class="dashboard-price-values">
+        <div><small>Modal / HPP</small><strong>${money(modal)}</strong></div>
+        <div><small>Harga jual</small><strong class="dashboard-price-sale">${money(item.harga_jual)}</strong></div>
+      </div>
+    </article>`;
+  }).join("");
 }
 
 function renderInventory() {
@@ -178,9 +304,9 @@ function renderInventory() {
   $("#inventory-count").textContent = `${rows.length} item`;
   $("#inventory-list").innerHTML = rows.map(x => `<tr>
     <td><strong>${escapeHtml(x.nama)}</strong><small>${escapeHtml(x.kategori)} · stok ${escapeHtml(x.satuan || "pcs")} · jual ${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td>
-    <td>${money(x.harga_jual)}<small>${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td><td>${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "pcs")}</td><td>${money(x.harga_beli)}<small>/ kemasan</small></td>
+    <td>${money(x.harga_jual)}<small>${escapeHtml(x.satuan_jual || x.satuan || "pcs")}</small></td><td>${Number(x.stok || 0).toLocaleString("id-ID")} ${escapeHtml(x.satuan || "pcs")}</td><td>${money(x.harga_beli)}<small>/ kemasan</small><small>HPP rata-rata: ${money(x.hpp_rata_rata_per_dasar ?? (Number(x.harga_beli || 0) / (isLiquidInventoryUnit(x.satuan) ? Number(x.isi_kemasan_beli || 1000) : 1)))}/${escapeHtml(x.satuan || "unit")}</small></td>
     <td><span class="stock ${Number(x.stok || 0) <= Number(x.minimum || 1) ? "low" : ""}">${Number(x.stok || 0) <= Number(x.minimum || 1) ? "Menipis" : "Aman"}</span></td>
-    <td><button class="table-action" data-edit-inv="${x.kategori}:${x.key}">Edit</button><button class="table-action danger" data-del-inv="${x.kategori}:${x.key}">Hapus</button></td>
+    <td>${x.rekomendasi_harga?.status === "pending" ? `<div class="price-recommendation"><strong>Harga saran: ${money(x.rekomendasi_harga.harga_saran)}</strong><small>Target margin ${Number(x.rekomendasi_harga.target_margin).toFixed(1)}% · margin saran ${Number(x.rekomendasi_harga.margin_saran || 0).toFixed(1)}%</small><button type="button" class="table-action" data-apply-price="${escapeHtml(x.kategori)}:${escapeHtml(x.key)}">Apply</button><button type="button" class="table-action danger" data-decline-price="${escapeHtml(x.kategori)}:${escapeHtml(x.key)}">Decline</button></div>` : x.rekomendasi_harga?.status === "needs_target" ? `<div class="price-recommendation"><strong>Target margin belum tersedia</strong><small>Isi target margin berdasarkan kebijakan barang ini.</small><button type="button" class="table-action" data-edit-inv="${escapeHtml(x.kategori)}:${escapeHtml(x.key)}">Atur target</button></div>` : ""}<button class="table-action" data-edit-inv="${x.kategori}:${x.key}">Edit</button><button class="table-action danger" data-del-inv="${x.kategori}:${x.key}">Hapus</button></td>
   </tr>`).join("") || `<tr><td colspan="6" class="empty">Belum ada inventori.</td></tr>`;
 }
 
@@ -1056,9 +1182,9 @@ function serviceCard(x) {
 
 function showMoreMenu() {
   view.modal("Menu Lainnya", `<div class="more-grid">
-    <button data-page="tools"><b>Tools</b><span>Scanner QR, PLN, Internet, website publik</span></button>
+    <button data-page="tools"><b>Tools</b><span>Cetak Label Unit, PLN, Internet, website publik</span></button>
     <a href="tracking.html"><b>Tracking Publik</b><span>Lihat halaman tracking pelanggan</span></a>
-    <a href="scanner.html"><b>Generator QR</b><span>Tool QR lama tetap tersedia</span></a>
+    <a href="t02-label.html"><b>Cetak Label Unit</b><span>Hubungkan T02 dan buat QR unit</span></a>
   </div>`);
 }
 
@@ -1159,13 +1285,45 @@ function renderRestockCalculation() {
   const liquid = isLiquidInventoryUnit(inv.satuan);
   const added = packages * packSize;
   const perBase = liquid ? price / packSize : price;
+  const currentStock = Math.max(0, Number(inv.stok || 0));
+  const oldPackSize = liquid ? Math.max(1, Number(inv.isi_kemasan_beli) || 1000) : 1;
+  const legacyHpp = Math.max(0, Number(inv.harga_beli) || 0) / oldPackSize;
+  const oldHpp = currentStock > 0 ? Math.max(0, Number(inv.hpp_rata_rata_per_dasar ?? legacyHpp) || 0) : 0;
+  const predictedStock = currentStock + added;
+  const weightedHpp = predictedStock > 0 ? ((currentStock * oldHpp) + (added * perBase)) / predictedStock : perBase;
+  const historicalMargin = getHistoricalMargin({
+    ...inv,
+    hpp_rata_rata_per_dasar: currentStock > 0 ? oldHpp : legacyHpp
+  });
+  const hasManualTarget = inv.target_margin_source === "manual"
+    && inv.target_margin !== null && inv.target_margin !== undefined && inv.target_margin !== "";
+  const targetMargin = hasManualTarget ? Math.min(90, Math.max(0, Number(inv.target_margin) || 0)) : historicalMargin;
+  const targetAvailable = targetMargin !== null && Number.isFinite(targetMargin);
+  const effectiveHpp = weightedHpp * (liquid ? Math.max(1, Number(inv.isi_jual) || 100) : 1);
+  const basePrice = targetAvailable ? effectiveHpp / (1 - targetMargin / 100) : 0;
+  const remainder = basePrice % 10000;
+  let suggestedPrice = 0;
+  if (targetAvailable) {
+    if (remainder <= 1000) suggestedPrice = Math.floor(basePrice / 10000) * 10000;
+    else if (remainder <= 5000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+    else if (remainder <= 6000) suggestedPrice = Math.floor(basePrice / 10000) * 10000 + 5000;
+    else suggestedPrice = (Math.floor(basePrice / 10000) + 1) * 10000;
+    if (suggestedPrice + 0.000001 < basePrice) suggestedPrice = Math.ceil(basePrice / 5000) * 5000;
+  }
+  const marginNow = Number(inv.harga_jual || 0) > 0 ? ((Number(inv.harga_jual) - effectiveHpp) / Number(inv.harga_jual)) * 100 : 0;
+  const marginSuggested = suggestedPrice > 0 ? ((suggestedPrice - effectiveHpp) / suggestedPrice) * 100 : 0;
 
   box.hidden = false;
   box.innerHTML = `
     <div><span>Akan masuk stok</span><strong>${added.toLocaleString("id-ID")} ${escapeHtml(inv.satuan || "pcs")}</strong></div>
     <div><span>Total pembelian</span><strong>${money(packages * price)}</strong></div>
-    <div><span>HPP / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(perBase)}</strong></div>
-    ${liquid ? `<small>Contoh: ${packages || 1} kemasan × ${packSize.toLocaleString("id-ID")} ${escapeHtml(inv.satuan)}. Harga jual dihitung terpisah per unit jual.</small>` : ""}
+    <div><span>HPP pembelian baru / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(perBase)}</strong></div>
+    <div><span>Prediksi HPP rata-rata / ${escapeHtml(inv.satuan || "unit")}</span><strong>${money(weightedHpp)}</strong></div>
+    <div><span>Target margin</span><strong>${targetAvailable ? `${targetMargin.toFixed(1)}%${hasManualTarget ? " (manual)" : " (historis)"}` : "Belum tersedia"}</strong></div>
+    <div><span>Harga jual sekarang</span><strong>${money(inv.harga_jual)}</strong></div>
+    <div><span>Harga jual disarankan</span><strong>${targetAvailable ? money(suggestedPrice) : "Atur target margin di form inventori"}</strong></div>
+    <small>Margin saat ini terhadap HPP prediksi: ${marginNow.toFixed(1)}%${targetAvailable ? ` · margin rekomendasi: ${marginSuggested.toFixed(1)}%` : " · belum ada margin historis yang valid"}. Harga tidak berubah sebelum kamu memilih Apply.</small>
+    ${liquid ? `<small>Stok dihitung dalam ${escapeHtml(inv.satuan)}; harga pembelian dikonversi ke biaya per ${escapeHtml(inv.satuan)}.</small>` : ""}
   `;
 }
 
@@ -1278,10 +1436,11 @@ function bind() {
       return;
     }
 
-    if (e.target.closest("#new-service") || e.target.closest("#new-service-3")) {
+    if (e.target.closest("#new-service")) {
       resetServiceForm(); switchPage("kasir"); return;
     }
 
+    if (e.target.closest("#reset-service-fields")) { resetServiceForm(); return; }
     if (e.target.closest("#more-menu")) { showMoreMenu(); return; }
     if (e.target.closest("#modal-close")) { view.closeModal(); return; }
     if (e.target.closest("#scanner-close")) { await stopCodeScanner(); return; }
@@ -1353,6 +1512,32 @@ function bind() {
     const open = e.target.closest("[data-open-service]");
     if (open) { await openService(open.dataset.openService); return; }
 
+    const applyPrice = e.target.closest("[data-apply-price]");
+    if (applyPrice) {
+      const [cat, key] = applyPrice.dataset.applyPrice.split(":");
+      try {
+        const price = await applyPriceRecommendation(cat, key);
+        await loadAll();
+        view.toast(`Harga jual berhasil diperbarui menjadi ${money(price)}.`, "success");
+      } catch (error) {
+        view.toast(error.message || "Gagal menerapkan harga rekomendasi.", "error");
+      }
+      return;
+    }
+
+    const declinePrice = e.target.closest("[data-decline-price]");
+    if (declinePrice) {
+      const [cat, key] = declinePrice.dataset.declinePrice.split(":");
+      try {
+        await declinePriceRecommendation(cat, key);
+        await loadAll();
+        view.toast("Rekomendasi ditolak. Harga jual tetap.", "info");
+      } catch (error) {
+        view.toast(error.message || "Gagal menolak rekomendasi.", "error");
+      }
+      return;
+    }
+
     const edit = e.target.closest("[data-edit-inv]");
     if (edit) {
       const [cat, key] = edit.dataset.editInv.split(":");
@@ -1360,7 +1545,7 @@ function bind() {
       if (x) {
         state.editInventoryKey = key; state.editInventoryCategory = cat;
         $("#inv-nama").value = x.nama; $("#inv-kategori").value = cat;
-        $("#inv-beli").value = x.harga_beli || 0; $("#inv-jual").value = x.harga_jual || 0;
+        $("#inv-beli").value = x.harga_beli || 0; $("#inv-jual").value = x.harga_jual || 0; $("#inv-target-margin").value = x.target_margin_source === "manual" && x.target_margin !== null && x.target_margin !== undefined ? x.target_margin : (getHistoricalMargin(x) === null ? "" : getHistoricalMargin(x).toFixed(1));
         $("#inv-stok").value = x.stok || 0; $("#inv-satuan").value = x.satuan || "pcs";
         $("#inv-pack-size").value = x.isi_kemasan_beli || ((x.satuan || "").toLowerCase() === "ml" ? 1000 : 1);
         $("#inv-sell-size").value = x.isi_jual || ((x.satuan || "").toLowerCase() === "ml" ? 100 : 1);
@@ -1560,6 +1745,12 @@ function bind() {
   });
 
   $("#input-item-nama").addEventListener("input", renderSuggestions);
+  $("#dashboard-sparepart-search")?.addEventListener("input", renderDashboardSparepartSearch);
+  $("#dashboard-sparepart-clear")?.addEventListener("click", () => {
+    $("#dashboard-sparepart-search").value = "";
+    renderDashboardSparepartSearch();
+    $("#dashboard-sparepart-search").focus();
+  });
   $("#add-item").addEventListener("click", addCartItem);
   $("#tab-jasa").addEventListener("click", () => { state.tab = "jasa"; $("#tab-jasa").classList.add("active"); $("#tab-sparepart").classList.remove("active"); renderSuggestions(); });
   $("#tab-sparepart").addEventListener("click", () => { state.tab = "sparepart"; $("#tab-sparepart").classList.add("active"); $("#tab-jasa").classList.remove("active"); renderSuggestions(); });
@@ -1638,6 +1829,7 @@ function bind() {
     const item = {
       nama: $("#inv-nama").value, kategori: $("#inv-kategori").value,
       harga_beli: $("#inv-beli").value, harga_jual: $("#inv-jual").value,
+      target_margin: $("#inv-target-margin").value,
       stok: $("#inv-stok").value, satuan: $("#inv-satuan").value,
       isi_kemasan_beli: $("#inv-pack-size").value,
       isi_jual: $("#inv-sell-size").value,
@@ -1646,7 +1838,7 @@ function bind() {
     if (!item.nama.trim()) return view.toast("Nama barang wajib diisi", "error");
     await saveInventory(item, state.editInventoryKey, state.editInventoryCategory);
     state.editInventoryKey = null; state.editInventoryCategory = null;
-    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = "");
+    ["inv-nama","inv-beli","inv-jual","inv-stok","inv-pack-size","inv-sell-size","inv-sell-unit"].forEach(id => $(`#${id}`).value = ""); $("#inv-target-margin").value = "";
     await loadAll(); view.toast("Inventori berhasil disimpan", "success");
   });
 
@@ -1743,7 +1935,10 @@ function bind() {
       .slice(0, 50);
     renderRestock();
     await loadAll();
-    view.toast(`Restock ${result.nama} berhasil. Stok sekarang ${result.stokBaru}.`, "success");
+    switchPage("inventory");
+    view.toast(result.rekomendasi_harga?.status === "pending"
+      ? `Restock berhasil. Harga jual disarankan ${money(result.rekomendasi_harga.harga_saran)}; pilih Apply atau Decline di Inventori.`
+      : `Restock ${result.nama} berhasil. Stok sekarang ${result.stokBaru}.`, "success");
   });
 
   $("#cancel-manual-ledger")?.addEventListener("click", () => {
@@ -1785,4 +1980,17 @@ watchAuth({
       window.location.href = "login.html";
     }
   }
+});
+
+
+// Direct thermal label printing on Android Chrome (Phomemo T02).
+document.getElementById("print-unit-label")?.addEventListener("click", () => {
+  const unitId = document.getElementById("barcode-input")?.value?.trim() || "";
+  const customer = document.getElementById("input-nama")?.value?.trim() || "";
+  const type = document.getElementById("input-merk")?.value?.trim() || "";
+  const target = new URL("t02-label.html", window.location.href);
+  if (unitId) target.searchParams.set("unit", unitId);
+  if (customer) target.searchParams.set("customer", customer);
+  if (type) target.searchParams.set("type", type);
+  window.location.href = target.href;
 });
