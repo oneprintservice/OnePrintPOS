@@ -15,6 +15,7 @@
 <div class="section-head"><div><h3>Akses cepat</h3><p class="muted">Pindai unit atau QR.</p></div></div>
 <div class="dashboard-scan-grid">
   <button id="scan-printer" class="dashboard-scan-card"><span class="dashboard-scan-icon">▣</span><span><b>Scan Unit</b><small>Identifikasi unit & riwayat servis</small></span><span class="dashboard-card-arrow">→</span></button>
+  <a href="t02-label.html" class="dashboard-scan-card"><span class="dashboard-scan-icon">▤</span><span><b>Cetak Label Unit</b><small>Buat QR dan cetak label T02</small></span><span class="dashboard-card-arrow">→</span></a>
 </div>
 
 <section class="dashboard-panel" aria-labelledby="dashboard-income-title">
@@ -81,51 +82,8 @@
 <div class="page-grid accounting-grid"><div class="panel"><div class="panel-head"><div><span class="eyebrow">CATAT MANUAL</span><h2>Transaksi Lain</h2></div></div><div class="form-grid"><label>Tipe<select id="ledger-type"><option>PEMASUKAN</option><option>PENGELUARAN</option></select></label><label>Kategori<select id="ledger-category"><option>OPERASIONAL</option><option>GAJI</option><option>SEWA</option><option>LAINNYA</option></select></label><label>Tanggal<input id="ledger-date" type="date"></label><label>Jumlah<input id="ledger-amount" type="number" min="0"></label><label class="span-2">Keterangan<input id="ledger-note" placeholder="Contoh: listrik, ongkir, pendapatan lain"></label></div><div class="manual-ledger-actions"><button type="button" id="save-manual-ledger" class="primary wide">Catat Transaksi</button><button type="button" id="cancel-manual-ledger" class="secondary wide" hidden>Batal Edit</button></div></div><div class="panel"><div class="panel-head"><div><span class="eyebrow">BUKU KAS</span><h2>Transaksi Bulan Ini</h2></div></div><div class="table-wrap"><table><thead><tr><th>Tanggal</th><th>Tipe</th><th>Keterangan</th><th>Jumlah</th><th></th></tr></thead><tbody id="ledger-list"></tbody></table></div></div></div></section>
 <section id="page-tools" class="page">
 <div class="quick-grid">
-  <a href="t02-label.html"><b>▤ Cetak Label Unit</b><span>Hubungkan Phomemo T02 dan cetak QR unit</span></a>
   <a href="pln.html"><b>⚡ Cetak PLN</b><span>Template PLN</span></a>
   <a href="internet.html"><b>◉ Cetak Internet</b><span>Template Internet</span></a>
-  <button type="button" id="open-maintenance" class="tool-card"><b>⌫ Pemeliharaan Data</b><span>Backup & bersihkan data lama</span></button>
-</div>
-
-<div class="panel printer-settings-panel">
-  <div class="panel-head">
-    <div><span class="eyebrow">HARDWARE</span><h2>Printer</h2></div>
-    <span id="printer-bridge-status" class="count-pill">Belum dicek</span>
-  </div>
-  <p class="muted">MX Linux menangani LaserJet A5 dan thermal. CUPS untuk antrian, Bridge untuk thermal.</p>
-
-  <div class="printer-profile-grid">
-    <div class="printer-profile-card">
-      <div class="profile-kicker">DOKUMEN</div>
-      <h3>Nota / Tanda Terima</h3>
-      <p class="muted">Nota/TT tetap A5. Printer memakai antrian CUPS.</p>
-      <div class="form-grid">
-        <label>Printer dokumen<select id="printer-document-transport"><option value="cups">Linux / CUPS</option><option value="winspool">Windows / Spooler</option></select></label>
-        <label>Ukuran kertas<select id="printer-document-paper"><option value="A5">A5</option></select></label>
-        <label class="span-2">Nama antrian printer<input id="printer-document-name" placeholder="Contoh: LaserJet_A5"></label>
-      </div>
-      <small class="muted">Target dokumen. Cetak browser tetap tersedia.</small>
-    </div>
-
-    <div class="printer-profile-card">
-      <div class="profile-kicker">LABEL THERMAL</div>
-      <h3>Printer Label</h3>
-      <p class="muted">Untuk label, QR, dan barcode. Terpisah dari LaserJet.</p>
-      <div class="form-grid">
-        <label>Mode label<select id="printer-mode"><option value="browser">Browser / dialog cetak</option><option value="bridge">Thermal via Bridge</option></select></label>
-        <label>Transport<select id="printer-transport"><option value="cups">Linux / CUPS (USB)</option><option value="winspool">Windows / Spooler (USB)</option><option value="network">Wi-Fi / LAN (TCP 9100)</option><option value="serial">Serial / Bluetooth (COM / TTY)</option></select></label>
-        <label class="span-2">Bridge URL<input id="printer-bridge-url" value="http://127.0.0.1:18181" placeholder="http://192.168.1.10:18181"></label>
-        <label id="printer-name-wrap"><span id="printer-name-label">Nama antrian CUPS</span><input id="printer-name" placeholder="Thermal_Label"></label>
-        <label id="printer-host-wrap" hidden>IP printer<input id="printer-host" placeholder="192.168.1.50"></label>
-        <label id="printer-port-wrap" hidden>Port<input id="printer-port" type="number" value="9100"></label>
-        <label id="printer-serial-wrap" hidden>Port Serial / Bluetooth<input id="printer-serial" placeholder="COM3 atau /dev/ttyUSB0"></label>
-        <label id="printer-baud-wrap" hidden>Baud rate<input id="printer-baud" type="number" value="9600"></label>
-        <label>Lebar kertas<select id="printer-paper"><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
-        <label>Token bridge (opsional)<input id="printer-token" type="password" placeholder="Jika bridge diberi token"></label>
-      </div>
-      <div class="printer-settings-actions"><button id="printer-save" class="primary">Simpan Setting</button><button id="printer-test" class="secondary">Tes Bridge</button><button id="printer-test-print" class="ghost">Cetak Tes Thermal</button></div>
-    </div>
-  </div>
 </div>
 
 <div class="panel maintenance-panel">
