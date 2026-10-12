@@ -3,6 +3,8 @@ import { watchAuth, signOut, startIdleTimeout } from "./core/auth.js";
 import { listInventory, saveInventory, removeInventory, changeStock, applyPriceRecommendation, declinePriceRecommendation } from "./features/inventory.js?v=20261009-margin2";
 import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
+
+
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
@@ -12,6 +14,34 @@ import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceip
 import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261009-margin2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
+
+// Preferensi tema disimpan lokal di perangkat; tidak mengubah data Firebase.
+const THEME_STORAGE_KEY = "oneprintpos-theme";
+function applyTheme(mode, persist = true) {
+  const dark = mode === "dark";
+  document.body.classList.toggle("dark-mode", dark);
+  const toggle = document.getElementById("theme-toggle");
+  if (toggle) toggle.checked = dark;
+  const icon = document.getElementById("theme-icon");
+  if (icon) icon.textContent = dark ? "☾" : "☀";
+  const text = document.getElementById("theme-text");
+  if (text) text.textContent = dark ? "Mode gelap" : "Mode terang";
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute("content", dark ? "#0b1220" : "#ffffff");
+  if (persist) {
+    try { localStorage.setItem(THEME_STORAGE_KEY, dark ? "dark" : "light"); } catch (_) {}
+  }
+}
+function initThemeSwitch() {
+  let saved = "light";
+  try { saved = localStorage.getItem(THEME_STORAGE_KEY) || "light"; } catch (_) {}
+  applyTheme(saved, false);
+  const toggle = document.getElementById("theme-toggle");
+  if (toggle && !toggle.dataset.bound) {
+    toggle.dataset.bound = "1";
+    toggle.addEventListener("change", () => applyTheme(toggle.checked ? "dark" : "light"));
+  }
+}
 
 const $ = s => document.querySelector(s);
 const money = n => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
@@ -1949,12 +1979,14 @@ function bind() {
   document.addEventListener("keydown", e => { if (e.key === "Escape") setMenu(false); });
 }
 
+initThemeSwitch();
+
 watchAuth({
   onUser: async user => {
     state.user = user;
     const displayName = user.displayName || (user.email || "user").split("@")[0];
     const greetingName = displayName.trim() || "Pengguna";
-    $("#user-name").textContent = greetingName;
+    $("#user-name").textContent = `Hai, ${greetingName}`;
     const avatar = $("#user-avatar");
     if (avatar) avatar.textContent = greetingName.slice(0, 2).toUpperCase();
     $("#login-screen").hidden = true;

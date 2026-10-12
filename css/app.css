@@ -1333,3 +1333,75 @@ th,td{
   content: none !important;
   display: none !important;
 }
+
+
+/* OnePrintPOS Beta: dark mode + menu akun */
+.theme-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 7px;margin-bottom:6px;border-radius:11px;color:#e2e8f0}
+.theme-label{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:750}
+.theme-switch{position:relative;display:inline-flex;flex-direction:row;align-items:center;gap:0;cursor:pointer;flex:none}
+.theme-switch input{position:absolute;opacity:0;width:1px;height:1px}
+.theme-slider{width:42px;height:24px;border-radius:999px;background:#475569;position:relative;transition:background .2s;display:block}
+.theme-slider:before{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transition:transform .2s}
+.theme-switch input:checked + .theme-slider{background:#3b82f6}
+.theme-switch input:checked + .theme-slider:before{transform:translateX(18px)}
+.theme-switch input:focus-visible + .theme-slider{outline:2px solid #93c5fd;outline-offset:3px}
+.sidebar .user-chip{margin-bottom:8px;padding:10px 7px}
+.sidebar .user-chip b{font-size:11px;color:#fff}
+.sidebar .user-chip small{font-size:9px}
+.sidebar .logout{order:3}
+.sidebar .user-chip{order:2}
+.sidebar .theme-row{order:1}
+body.dark-mode{
+  color-scheme:dark;
+  --bg:#0b1220;--panel:#111c2e;--ink:#e5edf8;--muted:#9aa9bd;--line:#29364a;
+  --primary:#60a5fa;--primary2:#3b82f6;--danger:#f87171;
+  background:var(--bg);color:var(--ink)
+}
+body.dark-mode .main,
+body.dark-mode .app-shell{background:var(--bg);color:var(--ink)}
+body.dark-mode .panel,
+body.dark-mode .stat-card,
+body.dark-mode .quick-grid>*,
+body.dark-mode .modal-box,
+body.dark-mode .result-card,
+body.dark-mode .track-card,
+body.dark-mode .auth-card{background:var(--panel);color:var(--ink);border-color:var(--line)}
+body.dark-mode .quick-grid>*,
+body.dark-mode .ghost,
+body.dark-mode .icon-btn{background:#1b2940;color:#dbeafe;border-color:var(--line)}
+body.dark-mode label{color:#cbd5e1}
+body.dark-mode input,
+body.dark-mode select,
+body.dark-mode textarea,
+body.dark-mode label input,
+body.dark-mode label select,
+body.dark-mode label textarea,
+body.dark-mode .toolbar input,
+body.dark-mode .toolbar select,
+body.dark-mode .search-small,
+body.dark-mode .track-form input,
+body.dark-mode .scan-strip input{background:#0d1728;color:var(--ink);border-color:var(--line)}
+body.dark-mode th{background:#172338;color:#b8c6da}
+body.dark-mode td{border-bottom-color:#29364a}
+body.dark-mode .suggestions,
+body.dark-mode .suggestion{background:#111c2e;color:var(--ink);border-color:var(--line)}
+body.dark-mode .suggestion span,
+body.dark-mode td small{color:#9aa9bd}
+body.dark-mode .track-grid div{background:#172338}
+body.dark-mode .track-grid small,
+body.dark-mode .track-note small{color:#9aa9bd}
+body.dark-mode .tabs button{color:#a8b6ca}
+body.dark-mode .secondary{background:#1e3557;color:#bfdbfe}
+body.dark-mode .table-action{background:#1e3151;color:#bfdbfe}
+body.dark-mode .table-action.danger{background:#451d25;color:#fecaca}
+body.dark-mode .status{filter:brightness(.85)}
+body.dark-mode .auth-body,
+body.dark-mode .public-body{background:radial-gradient(circle at top right,#172b49,transparent 35%),#0b1220}
+body.dark-mode .brand-large small{color:#9aa9bd}
+body.dark-mode .welcome{box-shadow:0 10px 28px #0003}
+body.dark-mode .total-row{border-top-color:#526078}
+body.dark-mode .count-pill{background:#1e3151;color:#bfdbfe}
+@media(max-width:1000px){
+  .sidebar .theme-row{display:flex}
+  .sidebar .theme-label{display:flex}
+}
