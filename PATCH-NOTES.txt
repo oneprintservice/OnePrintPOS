@@ -12,3 +12,10 @@ Overlay these paths onto the latest repository baseline:
 The HTML edits only add PWA metadata and service-worker registration. No Firebase config or business logic was changed. The service worker does not cache app pages, Firebase responses, authentication, or transactions. Its offline navigation fallback returns a small HTML page with HTTP 200 and clearly says internet is required.
 
 Next: commit these files only on betatest, wait for Pages deployment, then validate manifest/worker/icons and test app workflows and Phomemo T02 from Chrome Android. No APK should be produced until these checks pass.
+
+PATCH SPLASH SCREEN OPSI 1 (2026-10-13)
+- Ikon PWA 192x192 dan 512x512 menggunakan logo OnePrint Service lengkap dari assets/logos.png.
+- background_color dan theme_color manifest diubah menjadi putih (#ffffff).
+- Patch ini hanya mengubah aset ikon PWA dan warna tema/background manifest; tidak mengubah HTML, JavaScript, Firebase, atau fitur Bluetooth T02.
+- Untuk melihat perubahan pada APK TWA, unggah patch ke branch beta lalu bangun ulang paket melalui PWABuilder dan tanda tangani APK dengan keystore Beta yang sama.
+- Catatan: PWABuilder/TWA memakai aset ikon aplikasi untuk splash; ikon launcher juga dapat ikut berubah menjadi logo lengkap.
