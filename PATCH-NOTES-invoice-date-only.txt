@@ -1,0 +1,7 @@
+PATCH NOTES — invoice date only
+Basis: OnePrintPOS-betatest(1).zip
+Kept only the invoice date change from the previous darkmode/invoice fix:
+- Invoice/nota uses the date it is printed or reprinted.
+- Receipt/tanda terima keeps the saved service date.
+Dark mode and technician greeting changes are excluded; app.html, css/app.css, and js/app.js are preserved from the original baseline.
+No other application behavior was intentionally changed.

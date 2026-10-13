@@ -6,7 +6,7 @@ import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
-import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261013-invoice-date-fix";
+import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
 import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
 import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
 import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261009-margin2";
@@ -15,34 +15,6 @@ import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupC
 
 const $ = s => document.querySelector(s);
 const money = n => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
-
-// Tema UI lokal perangkat; tidak mengubah data transaksi/Firebase.
-const THEME_STORAGE_KEY = "oneprintpos-theme";
-function applyTheme(mode, persist = true) {
-  const dark = mode === "dark";
-  document.body.classList.toggle("dark-mode", dark);
-  const toggle = document.getElementById("theme-toggle");
-  if (toggle) toggle.checked = dark;
-  const icon = document.getElementById("theme-icon");
-  if (icon) icon.textContent = dark ? "☾" : "☀";
-  const label = document.getElementById("theme-text");
-  if (label) label.textContent = dark ? "Mode gelap" : "Mode terang";
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#0b1220" : "#ffffff");
-  if (persist) { try { localStorage.setItem(THEME_STORAGE_KEY, dark ? "dark" : "light"); } catch (_) {} }
-}
-function initThemeSwitch() {
-  let mode = "light";
-  try { mode = localStorage.getItem(THEME_STORAGE_KEY) || "light"; } catch (_) {}
-  applyTheme(mode, false);
-  const toggle = document.getElementById("theme-toggle");
-  if (toggle && !toggle.dataset.bound) {
-    toggle.dataset.bound = "1";
-    toggle.addEventListener("change", () => applyTheme(toggle.checked ? "dark" : "light"));
-  }
-}
-initThemeSwitch();
-
 
 // Business dates follow the browser's local calendar (WIB for the shop),
 // while event timestamps remain ISO/UTC. Never derive a business date/month
@@ -1982,7 +1954,7 @@ watchAuth({
     state.user = user;
     const displayName = user.displayName || (user.email || "user").split("@")[0];
     const greetingName = displayName.trim() || "Pengguna";
-    $("#user-name").textContent = `Hai, ${greetingName}`;
+    $("#user-name").textContent = greetingName;
     const avatar = $("#user-avatar");
     if (avatar) avatar.textContent = greetingName.slice(0, 2).toUpperCase();
     $("#login-screen").hidden = true;
