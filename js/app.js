@@ -3,19 +3,20 @@ import { watchAuth, signOut, startIdleTimeout } from "./core/auth.js";
 import { listInventory, saveInventory, removeInventory, changeStock, applyPriceRecommendation, declinePriceRecommendation } from "./features/inventory.js?v=20261009-margin2";
 import { saveCustomer, findCustomer } from "./features/customers.js";
 import {
-
-
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
-import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
+import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261013-invoice-date-fix";
 import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
 import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
 import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261009-margin2";
 import { listLedger, saveLedger, removeLedger, ledgerMonth, ledgerDate, formatLedgerDate } from "./features/accounting.js";
 import { findCleanupCandidates, formatCleanupDate, exportCleanupBackup, cleanupCandidates } from "./features/maintenance.js";
 
-// Preferensi tema disimpan lokal di perangkat; tidak mengubah data Firebase.
+const $ = s => document.querySelector(s);
+const money = n => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
+
+// Tema UI lokal perangkat; tidak mengubah data transaksi/Firebase.
 const THEME_STORAGE_KEY = "oneprintpos-theme";
 function applyTheme(mode, persist = true) {
   const dark = mode === "dark";
@@ -24,27 +25,24 @@ function applyTheme(mode, persist = true) {
   if (toggle) toggle.checked = dark;
   const icon = document.getElementById("theme-icon");
   if (icon) icon.textContent = dark ? "☾" : "☀";
-  const text = document.getElementById("theme-text");
-  if (text) text.textContent = dark ? "Mode gelap" : "Mode terang";
-  const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme) metaTheme.setAttribute("content", dark ? "#0b1220" : "#ffffff");
-  if (persist) {
-    try { localStorage.setItem(THEME_STORAGE_KEY, dark ? "dark" : "light"); } catch (_) {}
-  }
+  const label = document.getElementById("theme-text");
+  if (label) label.textContent = dark ? "Mode gelap" : "Mode terang";
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", dark ? "#0b1220" : "#ffffff");
+  if (persist) { try { localStorage.setItem(THEME_STORAGE_KEY, dark ? "dark" : "light"); } catch (_) {} }
 }
 function initThemeSwitch() {
-  let saved = "light";
-  try { saved = localStorage.getItem(THEME_STORAGE_KEY) || "light"; } catch (_) {}
-  applyTheme(saved, false);
+  let mode = "light";
+  try { mode = localStorage.getItem(THEME_STORAGE_KEY) || "light"; } catch (_) {}
+  applyTheme(mode, false);
   const toggle = document.getElementById("theme-toggle");
   if (toggle && !toggle.dataset.bound) {
     toggle.dataset.bound = "1";
     toggle.addEventListener("change", () => applyTheme(toggle.checked ? "dark" : "light"));
   }
 }
+initThemeSwitch();
 
-const $ = s => document.querySelector(s);
-const money = n => `Rp ${Number(n || 0).toLocaleString("id-ID")}`;
 
 // Business dates follow the browser's local calendar (WIB for the shop),
 // while event timestamps remain ISO/UTC. Never derive a business date/month
@@ -1978,8 +1976,6 @@ function bind() {
 
   document.addEventListener("keydown", e => { if (e.key === "Escape") setMenu(false); });
 }
-
-initThemeSwitch();
 
 watchAuth({
   onUser: async user => {
