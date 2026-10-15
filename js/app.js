@@ -104,20 +104,29 @@ function offerWhatsAppCompletionMessage(service) {
 
   const greeting = getTimeGreeting();
   const number = service.nomor || service.key || "-";
-  const device = [service.merk, service.serial ? `SN: ${service.serial}` : ""]
-    .filter(Boolean).join(" — ") || "perangkat Anda";
+  const device = service.merk || "perangkat Anda";
+  const serial = service.serial || "-";
+  const totalInvoice = new Intl.NumberFormat("id-ID", {
+    style: "currency", currency: "IDR", maximumFractionDigits: 0
+  }).format(Number(service.total || 0));
   const message = [
     `Selamat ${greeting}.`,
     "",
-    "Kami informasikan bahwa perangkat Anda sudah selesai diperbaiki di OnePrint Service.",
+    "Kami informasikan bahwa perangkat Anda sudah *SELESAI DIPERBAIKI* di *OnePrint Service*.",
     "",
-    `No. Servis: ${number}`,
-    `Perangkat: ${device}`,
-    "Status: Selesai",
+    `*No. Servis:* ${number}`,
     "",
-    "Silakan menghubungi kami untuk konfirmasi pengambilan perangkat. Untuk layanan antar-jemput/rekanan, pengiriman akan dikoordinasikan seperti biasa.",
+    `*Perangkat:* ${device}`,
     "",
-    "Terima kasih telah mempercayakan servis perangkat kepada OnePrint Service."
+    `*Serial Number:* ${serial}`,
+    "",
+    `*Total Biaya Perbaikan:* ${totalInvoice}`,
+    "",
+    "Silakan menghubungi kami untuk konfirmasi pengambilan perangkat. Untuk layanan antar-jemput, pengiriman akan dikoordinasikan seperti biasa.",
+    "",
+    "Terima kasih telah mempercayakan servis perangkat Anda kepada *OnePrint Service*.",
+    "",
+    "> ⓘ _Pesan ini dikirim secara otomatis melalui sistem._"
   ].join("\n");
 
   view.modal("Servis selesai — hubungi pelanggan", `
