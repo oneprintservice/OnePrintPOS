@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="id">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b73ff"><link rel="manifest" href="/manifest.webmanifest">
 <title>Cetak Label Unit · OnePrintPOS</title>
 <style>
 :root{color-scheme:light;--ink:#172033;--muted:#657084;--line:#dbe1e8;--accent:#155eef}
@@ -60,8 +60,8 @@ function drawLabel(){
 const type=$('unitType').value.trim();
 
 // ID unit lebih besar dan tebal
-ctx.font='bold 18px Arial';
-wrapText(id,134,4,240,21);
+ctx.font='bold 20px Arial';
+wrapText('ID Reg: '+id,134,4,240,21);
 
 // Informasi pelanggan dan tipe lebih mudah dibaca
 ctx.font='bold 15px Arial';
@@ -145,4 +145,5 @@ if(params.get('customer'))$('customerInfo').value=params.get('customer');
 if(params.get('type'))$('unitType').value=params.get('type');
 if(getId())drawLabel();
 </script>
+<script src="/js/pwa-register.js" defer></script>
 </body></html>

@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "dev.pages.betapos.twa",
+      "sha256_cert_fingerprints": [
+        "86:31:92:D0:43:8C:F8:EE:6A:97:EA:F3:BC:D9:59:CE:E4:2B:60:63:DC:7A:88:9A:3A:F6:55:16:CC:E2:A8:6C"
+      ]
+    }
+  }
+]

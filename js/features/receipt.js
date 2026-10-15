@@ -197,7 +197,10 @@ export function buildReceipt(data, tipe = "nota") {
   const teknisi = data.teknisi || "-";
   const jasa = Array.isArray(data.jasa) ? data.jasa : [];
   const sparepart = Array.isArray(data.sparepart) ? data.sparepart : [];
-  const tgl = new Date(data.tanggal || Date.now()).toLocaleDateString("id-ID");
+  // Invoice displays the actual date it is printed/reprinted. The receipt keeps
+  // the original service registration date, independently of invoice date.
+  const tanggalDokumen = tipe === "nota" ? new Date() : new Date(data.tanggal || Date.now());
+  const tgl = tanggalDokumen.toLocaleDateString("id-ID");
   const trackingUrl = `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(noNota)}`;
 
   const logoPath = "assets/logos.png";
