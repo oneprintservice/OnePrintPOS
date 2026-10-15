@@ -78,6 +78,63 @@ const dateInput = value => {
   return localDateInput(d);
 };
 
+function getTimeGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour >= 4 && hour < 11) return "pagi";
+  if (hour >= 11 && hour < 15) return "siang";
+  if (hour >= 15 && hour < 18) return "sore";
+  return "malam";
+}
+
+function normalizeWhatsAppNumber(value) {
+  let number = String(value || "").replace(/\D/g, "");
+  if (!number) return "";
+  if (number.startsWith("0")) number = `62${number.slice(1)}`;
+  else if (number.startsWith("8")) number = `62${number}`;
+  // Numbers already starting with country code 62 are kept as-is.
+  return number;
+}
+
+function offerWhatsAppCompletionMessage(service) {
+  const phone = normalizeWhatsAppNumber(service.telp);
+  if (!phone) {
+    view.toast("Status servis selesai. Nomor HP kosong, pesan pelanggan dilewati.", "info");
+    return;
+  }
+
+  const greeting = getTimeGreeting();
+  const number = service.nomor || service.key || "-";
+  const device = [service.merk, service.serial ? `SN: ${service.serial}` : ""]
+    .filter(Boolean).join(" — ") || "perangkat Anda";
+  const message = [
+    `Selamat ${greeting}.`,
+    "",
+    "Kami informasikan bahwa perangkat Anda sudah selesai diperbaiki di OnePrint Service.",
+    "",
+    `No. Servis: ${number}`,
+    `Perangkat: ${device}`,
+    "Status: Selesai",
+    "",
+    "Silakan menghubungi kami untuk konfirmasi pengambilan perangkat. Untuk layanan antar-jemput/rekanan, pengiriman akan dikoordinasikan seperti biasa.",
+    "",
+    "Terima kasih telah mempercayakan servis perangkat kepada OnePrint Service."
+  ].join("\n");
+
+  view.modal("Servis selesai — hubungi pelanggan", `
+    <div class="stack" style="gap:12px">
+      <p>Nomor pelanggan tersedia. Pesan berikut sudah disiapkan dengan sapaan waktu otomatis.</p>
+      <div style="white-space:pre-wrap;border:1px solid var(--line,#ddd);border-radius:10px;padding:12px;line-height:1.5">${escapeHtml(message)}</div>
+      <button id="send-completion-whatsapp" class="primary" type="button">Buka WhatsApp dan kirim pesan</button>
+      <p class="muted" style="font-size:12px;margin:0">WhatsApp akan membuka percakapan dengan pesan terisi. Pesan belum terkirim sampai tombol Kirim ditekan di WhatsApp.</p>
+    </div>
+  `);
+  const button = $("#send-completion-whatsapp");
+  button?.addEventListener("click", () => {
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  });
+}
+
 function currentForm() {
   return {
     pelanggan: $("#input-nama").value.trim(),
@@ -1057,9 +1114,15 @@ async function saveCurrentService(print = false, type = "nota") {
   await loadAll();
   state.editServiceKey = savedKey;
 
-  const changedStatus = statusOf(old) && statusOf(old) !== statusOf(data);
-  view.toast(changedStatus ? `Status berubah: ${statusOf(old)} → ${statusOf(data)}` : "Perubahan servis berhasil disimpan", "success");
+  const changedStatus = Boolean(oldStatus) && oldStatus !== newStatus;
+  view.toast(changedStatus ? `Status berubah: ${oldStatus} → ${newStatus}` : "Perubahan servis berhasil disimpan", "success");
   if (print) await printReceiptSmart(data, type);
+
+  // Offer a WhatsApp-ready message only on the first transition into SELESAI.
+  // This does not send automatically; the user confirms the send in WhatsApp.
+  const justCompleted = oldStatus !== "SELESAI" && newStatus === "SELESAI";
+  state.editServiceOriginal = { ...data, key: savedKey };
+  if (justCompleted) offerWhatsAppCompletionMessage({ ...data, key: savedKey });
 }
 
 async function openService(key) {

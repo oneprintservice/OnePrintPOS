@@ -1,0 +1,12 @@
+OnePrintPOS Beta patch: WhatsApp-ready message when service changes to SELESAI
+Baseline: OnePrintPOS-betatest(1).zip
+Files changed: app.html (cache-busting version only), js/app.js.
+Behavior:
+- Only offers a WhatsApp message when an existing status changes from a non-SELESAI status to SELESAI.
+- Message uses local device time greeting: Selamat pagi/siang/sore/malam; no Pak/Bu/Kak guess.
+- Reads phone from the existing service field `telp`; blank/invalid-empty phone skips WhatsApp offer without blocking status save.
+- Normalizes Indonesian numbers starting 0 or 8 to country code 62.
+- Opens WhatsApp with a prefilled message; user must press Send in WhatsApp. It is not automatic sending.
+- Saves the new status baseline after the transition to avoid offering duplicate messages on subsequent saves.
+- Does not change Firebase schema, role/access, accounting, invoice dates, or Bluetooth/T02 code.
+Apply to betatest first. Test with a test service and a test phone number before normal use.

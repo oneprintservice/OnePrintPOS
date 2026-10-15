@@ -7,8 +7,8 @@
   "start_url": "/login.html",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#f4f6f9",
+  "theme_color": "#0b73ff",
   "icons": [
     {
       "src": "/assets/pwa-192.png",
@@ -22,7 +22,5 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "dir": "auto",
-  "orientation": "portrait"
+  ]
 }
