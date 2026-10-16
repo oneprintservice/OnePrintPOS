@@ -102,11 +102,19 @@ export function makeServiceNumber(date = new Date()) {
 
 export function isVisibleService(service, now = new Date()) {
   const status = String(service.status || "").trim().toUpperCase();
-  // Dashboard/list keeps the current month + previous calendar month.
-  // Older records remain visible only while not DIAMBIL/CANCEL.
+  // Active/non-terminal services remain visible regardless of intake date.
   if (!TERMINAL_STATUSES.has(status)) return true;
+
+  // Count terminal retention from the status event, not the original intake
+  // date. An old service therefore will not disappear immediately when
+  // changed to CANCEL or DIAMBIL.
+  const referenceValue = status === "DIAMBIL"
+    ? (service.diambilAt || service.updatedAt || service.tanggal)
+    : (service.updatedAt || service.tanggal);
+
+  // Keep the current calendar month and the previous calendar month.
   const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const date = parseDate(service.tanggal);
+  const date = parseDate(referenceValue);
   return date >= start.getTime();
 }
 
