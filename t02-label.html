@@ -68,7 +68,7 @@ ctx.font='bold 15px Arial';
 let y=38;
 
 if(customer){
-  const customerLines=wrapText('Pelanggan: '+customer,134,y,240,18);
+  const customerLines=drawCustomerText(customer,134,y,240,18);
   y+=Math.max(42,customerLines*18+10);
 }
 
@@ -84,6 +84,34 @@ ctx.fillText('OnePrint Service',134,238);
  };
  if(q instanceof HTMLImageElement&&!q.complete){q.onload=draw;}else draw();
  return true;
+}
+function drawCustomerText(customer,x,y,maxWidth,lineHeight){
+ // Label "Pelanggan:" hanya muncul di baris pertama. Baris lanjutan
+ // (termasuk yang dibuat dengan Enter) sejajar dengan awal nama pelanggan.
+ const prefix='Pelanggan: ';
+ const prefixWidth=ctx.measureText(prefix).width;
+ const valueX=x+prefixWidth;
+ const firstWidth=Math.max(20,maxWidth-prefixWidth);
+ const paragraphs=String(customer).replace(/\r/g,'').split('\n');
+ const lines=[];
+ paragraphs.forEach((paragraph,paragraphIndex)=>{
+   const words=paragraph.trim().split(/\s+/).filter(Boolean);
+   if(!words.length){lines.push({text:'',first:paragraphIndex===0});return;}
+   let line='',first=paragraphIndex===0;
+   for(const word of words){
+     const available=first?firstWidth:maxWidth;
+     const test=line?line+' '+word:word;
+     if(ctx.measureText(test).width>available&&line){
+       lines.push({text:line,first});line=word;first=false;
+     }else line=test;
+   }
+   lines.push({text:line,first});
+ });
+ lines.slice(0,6).forEach((line,i)=>{
+   if(i===0)ctx.fillText(prefix+line.text,x,y);
+   else ctx.fillText(line.text,valueX,y+i*lineHeight);
+ });
+ return Math.min(lines.length,6);
 }
 function wrapText(text,x,y,maxWidth,lineHeight){
  // Enter manual tetap menjadi pemisah baris; teks panjang otomatis membungkus.
