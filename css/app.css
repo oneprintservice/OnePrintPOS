@@ -1333,3 +1333,27 @@ th,td{
   content: none !important;
   display: none !important;
 }
+
+
+/* OnePrintPOS Sky Blue Edition — Manchester City inspired palette */
+:root{
+ --bg:#f4f9ff; --panel:#ffffff; --ink:#172b4d; --muted:#64748b;
+ --line:#dce8f5; --primary:#6cabdd; --primary2:#398ac7;
+ --primary-soft:#e4f3ff; --navy:#172b4d; --navy2:#24476f;
+ --danger:#dc4c55; --success:#168568; --warning:#c9a45c;
+ --radius:18px; --shadow:0 8px 26px rgba(23,43,77,.07);
+ --shadow-lg:0 18px 44px rgba(23,43,77,.13);
+}
+.sidebar{background:linear-gradient(180deg,#172b4d,#203e63)!important}
+.sidebar nav button:hover,.sidebar nav button.active{background:rgba(108,171,221,.18)!important;color:#fff!important}
+.sidebar nav button.active{box-shadow:inset 3px 0 #c9a45c!important}
+.welcome{background:linear-gradient(125deg,#172b4d,#398ac7)!important}
+.primary{background:linear-gradient(135deg,#6cabdd,#398ac7)!important;color:#fff!important;box-shadow:0 5px 13px rgba(57,138,199,.18)}
+.primary:hover{background:#398ac7!important}
+.secondary,.tabs button.active,.profile-kicker{color:#245985!important}
+.secondary{background:#e4f3ff!important}
+label input:focus,label select:focus,label textarea:focus,.toolbar input:focus{border-color:#6cabdd!important;box-shadow:0 0 0 3px rgba(108,171,221,.18)!important}
+.avatar{background:linear-gradient(135deg,#6cabdd,#398ac7)!important;color:#fff}
+nav button svg,.sidebar nav button svg{stroke-width:1.8}
+/* Gold is reserved for small premium accents, not large surfaces. */
+.side-brand small,.eyebrow{color:#c9a45c}
