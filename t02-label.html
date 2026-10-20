@@ -25,9 +25,9 @@ button{height:44px;border:0;border-radius:10px;padding:0 15px;font:inherit;font-
 <div id="status" class="status">Belum terhubung. Gunakan Chrome Android dan aktifkan Bluetooth.</div>
 </section>
 <section class="card">
-<h2 style="font-size:17px;margin:0 0 12px">Preview label (48 × 30 mm)</h2>
-<div class="preview"><canvas id="label" width="384" height="240"></canvas></div>
-<p class="small">Area cetak 384 × 240 titik. Roll continuous: printer akan mengumpan sesuai tinggi gambar.</p>
+<h2 style="font-size:17px;margin:0 0 12px">Preview label (48 × 33 mm)</h2>
+<div class="preview"><canvas id="label" width="384" height="264"></canvas></div>
+<p class="small">Area cetak 384 × 264 titik. Roll continuous: printer akan mengumpan sesuai tinggi gambar.</p>
 <div class="row" style="margin-top:12px"><button id="print" class="primary" disabled>Cetak Label</button><button id="disconnect">Putuskan</button></div>
 </section>
 </main>
@@ -45,13 +45,13 @@ function makeTimestampId(){
 $('generateId').addEventListener('click',()=>{$('unitId').value=makeTimestampId();drawLabel();});
 function drawLabel(){
  const id=getId(); if(!id){status('Isi ID unit dulu.','err');return false;}
- ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,384,264);
  // Build QR offscreen using qrcodejs, then draw it crisp to target canvas.
  const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-9999px;top:0;background:#fff;padding:0';document.body.appendChild(holder);
  new QRCode(holder,{text:id,width:176,height:176,correctLevel:QRCode.CorrectLevel.M});
  const q=holder.querySelector('canvas')||holder.querySelector('img');
  const draw=()=>{
-   ctx.fillStyle='#fff';ctx.fillRect(0,0,384,240);
+   ctx.fillStyle='#fff';ctx.fillRect(0,0,384,264);
    ctx.imageSmoothingEnabled=false;
    // QR 15 mm (120 titik), ditempatkan dekat tepi atas untuk memudahkan sobek.
    ctx.drawImage(q,4,12,120,120);
@@ -78,7 +78,7 @@ if(type){
 }
 
 ctx.font='bold 12px Arial';
-ctx.fillText('OnePrint Service',134,210);
+ctx.fillText('OnePrint Service',134,238);
    document.body.removeChild(holder);
    status('Preview siap. Pastikan ID benar sebelum cetak.','ok');
  };
@@ -115,8 +115,8 @@ async function send(bytes){if(!connected||!characteristic)throw new Error('Print
 async function printLabel(){
  if(!getId()){status('Isi ID unit terlebih dahulu.','err');return}
  if(!drawLabel())return;
- const {data}=ctx.getImageData(0,0,384,240);
- const widthBytes=48, rows=240, raster=new Uint8Array(widthBytes*rows);
+ const {data}=ctx.getImageData(0,0,384,264);
+ const widthBytes=48, rows=264, raster=new Uint8Array(widthBytes*rows);
  for(let y=0;y<rows;y++)for(let x=0;x<384;x++){
    const i=(y*384+x)*4;
    const gray=(data[i]*299+data[i+1]*587+data[i+2]*114)/1000;
