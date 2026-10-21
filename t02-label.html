@@ -4,11 +4,11 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b73ff"><link rel="manifest" href="/manifest.webmanifest">
 <title>Cetak Label Unit · OnePrintPOS</title>
 <style>
-:root{color-scheme:light;--ink:#172033;--muted:#657084;--line:#dbe1e8;--accent:#155eef}
-*{box-sizing:border-box}body{margin:0;background:#f4f6f9;color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:680px;margin:0 auto;padding:20px 16px 36px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin:14px 0;box-shadow:0 4px 18px #1720330a}
-h1{font-size:22px;margin:0 0 5px}p{margin:5px 0;color:var(--muted)}label{display:block;font-weight:650;margin-bottom:7px}input{width:100%;height:46px;border:1px solid #cbd3df;border-radius:10px;padding:0 12px;font:inherit}
-button{height:44px;border:0;border-radius:10px;padding:0 15px;font:inherit;font-weight:650;cursor:pointer;background:#e9edf4;color:#172033}button.primary{background:var(--accent);color:white}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}.status{font-size:13px;padding:10px 12px;border-radius:9px;background:#f0f3f8;color:#344054;margin-top:12px}.status.ok{background:#e9f8ef;color:#17663a}.status.err{background:#fff0f0;color:#a12626}.preview{display:flex;justify-content:center;overflow:hidden;background:#eef1f5;border-radius:10px;padding:16px}.preview canvas{width:min(100%,384px);height:auto;image-rendering:pixelated;border:1px dashed #b7c0cd;background:white}.small{font-size:12px}.back{display:inline-block;color:var(--accent);text-decoration:none;margin-bottom:14px}
+:root{color-scheme:light;--ink:#172b4d;--muted:#64748b;--line:#dce8f5;--accent:#398ac7;--sky:#6cabdd;--navy:#172b4d;--gold:#c9a45c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0%,#e4f3ff,transparent 34%),#f4f9ff;color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:680px;margin:0 auto;padding:20px 16px 36px}.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:20px;padding:18px;margin:14px 0;box-shadow:0 10px 28px rgba(23,43,77,.07)}
+h1{font-size:22px;margin:0 0 5px}p{margin:5px 0;color:var(--muted)}label{display:block;font-weight:650;margin-bottom:7px}input,textarea{width:100%;min-height:46px;border:1px solid #d4e0ed;border-radius:12px;padding:11px 12px;font:inherit;color:var(--ink);background:#fff}textarea{min-height:76px;resize:vertical;line-height:1.4}input:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px #6cabdd30}
+button{min-height:44px;border:0;border-radius:12px;padding:0 15px;font:inherit;font-weight:650;cursor:pointer;background:#e8f3fc;color:var(--navy);transition:transform .18s,box-shadow .18s}button:active{transform:translateY(1px)}button.primary{background:linear-gradient(135deg,var(--sky),var(--accent));color:white;box-shadow:0 5px 14px #398ac729}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}.status{font-size:13px;padding:10px 12px;border-radius:9px;background:#f0f3f8;color:#344054;margin-top:12px}.status.ok{background:#e9f8ef;color:#17663a}.status.err{background:#fff0f0;color:#a12626}.preview{display:flex;justify-content:center;overflow:hidden;background:#eef1f5;border-radius:10px;padding:16px}.preview canvas{width:min(100%,384px);height:auto;image-rendering:pixelated;border:1px dashed #b7c0cd;background:white}.small{font-size:12px}.back{display:inline-block;color:var(--accent);text-decoration:none;margin-bottom:14px;font-weight:700}.preview{background:linear-gradient(135deg,#e8f4ff,#f6f9fd);border:1px solid #dce8f5}.preview canvas{border:1px solid #dce8f5;border-radius:4px;box-shadow:0 4px 14px #172b4d12}
 </style>
 </head>
 <body><main>
@@ -18,7 +18,7 @@ button{height:44px;border:0;border-radius:10px;padding:0 15px;font:inherit;font-
 <label for="unitId">ID Unit / Barcode</label>
 <input id="unitId" autocomplete="off" placeholder="ID unit atau buat ID waktu">
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
- <label>Info pelanggan<input id="customerInfo" placeholder="Nama pelanggan"></label>
+ <label>Info pelanggan<textarea id="customerInfo" rows="2" placeholder="Nama pelanggan — tekan Enter untuk baris baru"></textarea></label>
  <label>Tipe unit<input id="unitType" placeholder="Epson L3210"></label>
 </div>
 <div class="row" style="margin-top:12px"><button id="generateId">Buat ID waktu</button><button id="connect" class="primary">Hubungkan T02</button><button id="previewBtn">Buat Preview</button></div>
@@ -68,8 +68,8 @@ ctx.font='bold 15px Arial';
 let y=38;
 
 if(customer){
-  wrapText('Pelanggan: '+customer,134,y,240,18);
-  y+=42;
+  const customerLines=drawCustomerText(customer,134,y,240,18);
+  y+=Math.max(42,customerLines*18+10);
 }
 
 if(type){
@@ -85,11 +85,49 @@ ctx.fillText('OnePrint Service',134,238);
  if(q instanceof HTMLImageElement&&!q.complete){q.onload=draw;}else draw();
  return true;
 }
+function drawCustomerText(customer,x,y,maxWidth,lineHeight){
+ // Label "Pelanggan:" hanya muncul di baris pertama. Baris lanjutan
+ // (termasuk yang dibuat dengan Enter) sejajar dengan awal nama pelanggan.
+ const prefix='Pelanggan: ';
+ const prefixWidth=ctx.measureText(prefix).width;
+ const valueX=x+prefixWidth;
+ const firstWidth=Math.max(20,maxWidth-prefixWidth);
+ const paragraphs=String(customer).replace(/\r/g,'').split('\n');
+ const lines=[];
+ paragraphs.forEach((paragraph,paragraphIndex)=>{
+   const words=paragraph.trim().split(/\s+/).filter(Boolean);
+   if(!words.length){lines.push({text:'',first:paragraphIndex===0});return;}
+   let line='',first=paragraphIndex===0;
+   for(const word of words){
+     const available=first?firstWidth:maxWidth;
+     const test=line?line+' '+word:word;
+     if(ctx.measureText(test).width>available&&line){
+       lines.push({text:line,first});line=word;first=false;
+     }else line=test;
+   }
+   lines.push({text:line,first});
+ });
+ lines.slice(0,6).forEach((line,i)=>{
+   if(i===0)ctx.fillText(prefix+line.text,x,y);
+   else ctx.fillText(line.text,valueX,y+i*lineHeight);
+ });
+ return Math.min(lines.length,6);
+}
 function wrapText(text,x,y,maxWidth,lineHeight){
- const words=String(text).split(/\\s+/);let line='',lines=[];
- for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test;}
- if(line)lines.push(line);
- lines.slice(0,4).forEach((l,i)=>ctx.fillText(l,x,y+i*lineHeight));
+ // Enter manual tetap menjadi pemisah baris; teks panjang otomatis membungkus.
+ const paragraphs=String(text).replace(/\r/g,'').split('\n');
+ const lines=[];
+ for(const paragraph of paragraphs){
+   if(!paragraph.trim()){lines.push('');continue;}
+   const words=paragraph.trim().split(/\s+/);let line='';
+   for(const word of words){
+     const test=line?line+' '+word:word;
+     if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;
+   }
+   if(line)lines.push(line);
+ }
+ lines.slice(0,6).forEach((line,i)=>ctx.fillText(line,x,y+i*lineHeight));
+ return Math.min(lines.length,6);
 }
 async function connect(){
  if(!('bluetooth'in navigator)){throw new Error('Browser tidak mendukung Web Bluetooth. Gunakan Chrome Android.');}
