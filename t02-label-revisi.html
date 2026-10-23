@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0b73ff"><link rel="manifest" href="/manifest.webmanifest">
+<title>Cetak Label Unit · OnePrintPOS</title>
+<style>
+:root{color-scheme:light;--ink:#172b4d;--muted:#64748b;--line:#dce8f5;--accent:#398ac7;--sky:#6cabdd;--navy:#172b4d;--gold:#c9a45c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0%,#e4f3ff,transparent 34%),#f4f9ff;color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:680px;margin:0 auto;padding:20px 16px 36px}.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:20px;padding:18px;margin:14px 0;box-shadow:0 10px 28px rgba(23,43,77,.07)}
+h1{font-size:22px;margin:0 0 5px}p{margin:5px 0;color:var(--muted)}label{display:block;font-weight:650;margin-bottom:7px}input,textarea{width:100%;min-height:46px;border:1px solid #d4e0ed;border-radius:12px;padding:11px 12px;font:inherit;color:var(--ink);background:#fff}textarea{min-height:76px;resize:vertical;line-height:1.4}input:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px #6cabdd30}
+button{min-height:44px;border:0;border-radius:12px;padding:0 15px;font:inherit;font-weight:650;cursor:pointer;background:#e8f3fc;color:var(--navy);transition:transform .18s,box-shadow .18s}button:active{transform:translateY(1px)}button.primary{background:linear-gradient(135deg,var(--sky),var(--accent));color:white;box-shadow:0 5px 14px #398ac729}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}.status{font-size:13px;padding:10px 12px;border-radius:9px;background:#f0f3f8;color:#344054;margin-top:12px}.status.ok{background:#e9f8ef;color:#17663a}.status.err{background:#fff0f0;color:#a12626}.preview{display:flex;justify-content:center;overflow:hidden;background:#eef1f5;border-radius:10px;padding:16px}.preview canvas{width:min(100%,384px);height:auto;image-rendering:pixelated;border:1px dashed #b7c0cd;background:white}.small{font-size:12px}.back{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:12px;background:linear-gradient(135deg,var(--sky),var(--accent));color:#fff;text-decoration:none;margin:0 0 14px;font-weight:700;box-shadow:0 5px 14px #398ac729}.back:active{transform:translateY(1px)}.preview{background:linear-gradient(135deg,#e8f4ff,#f6f9fd);border:1px solid #dce8f5}.preview canvas{border:1px solid #dce8f5;border-radius:4px;box-shadow:0 4px 14px #172b4d12}
+</style>
+</head>
+<body><main>
+<a class="back" href="app.html">← Kembali ke OnePrintPOS</a>
+<h1>Cetak Label Unit · Phomemo T02</h1><p>Hubungkan printer lewat Bluetooth Chrome, buat QR ID otomatis, lalu cetak label unit.</p>
+<section class="card">
+<label for="unitId">ID Unit / Barcode</label>
+<input id="unitId" autocomplete="off" placeholder="ID unit atau buat ID waktu">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+ <label>Info pelanggan<textarea id="customerInfo" rows="2" placeholder="Nama pelanggan — tekan Enter untuk baris baru"></textarea></label>
+ <label>Tipe unit<input id="unitType" placeholder="Epson L3210"></label>
+</div>
+<div class="row" style="margin-top:12px"><button id="generateId">Buat ID waktu</button><button id="connect" class="primary">Hubungkan T02</button><button id="previewBtn">Buat Preview</button></div>
+<div id="status" class="status">Belum terhubung. Gunakan Chrome Android dan aktifkan Bluetooth.</div>
+</section>
+<section class="card">
+<h2 style="font-size:17px;margin:0 0 12px">Preview label (48 × 33 mm)</h2>
+<div class="preview"><canvas id="label" width="384" height="264"></canvas></div>
+<p class="small">Area cetak 384 × 264 titik. Roll continuous: printer akan mengumpan sesuai tinggi gambar.</p>
+<div class="row" style="margin-top:12px"><button id="print" class="primary" disabled>Cetak Label</button><button id="disconnect">Putuskan</button></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+const $=id=>document.getElementById(id), canvas=$('label'), ctx=canvas.getContext('2d',{willReadFrequently:true});
+let device=null, server=null, characteristic=null, connected=false;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function status(msg,kind=''){ $('status').textContent=msg; $('status').className='status '+kind; }
+function getId(){return $('unitId').value.trim();}
+function makeTimestampId(){
+ const d=new Date(), p=n=>String(n).padStart(2,'0');
+ return p(d.getDate())+p(d.getMonth()+1)+String(d.getFullYear()).slice(-2)+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds());
+}
+$('generateId').addEventListener('click',()=>{$('unitId').value=makeTimestampId();drawLabel();});
+function drawLabel(){
+ const id=getId(); if(!id){status('Isi ID unit dulu.','err');return false;}
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,384,264);
+ // Build QR offscreen using qrcodejs, then draw it crisp to target canvas.
+ const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-9999px;top:0;background:#fff;padding:0';document.body.appendChild(holder);
+ new QRCode(holder,{text:id,width:176,height:176,correctLevel:QRCode.CorrectLevel.M});
+ const q=holder.querySelector('canvas')||holder.querySelector('img');
+ const draw=()=>{
+   ctx.fillStyle='#fff';ctx.fillRect(0,0,384,264);
+   ctx.imageSmoothingEnabled=false;
+   // Garis putus-putus sebagai pemanas awal, margin sekitar 5 mm (40 titik) di tiap sisi.
+   ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.setLineDash([9,5]);ctx.beginPath();ctx.moveTo(40,12);ctx.lineTo(344,12);ctx.stroke();ctx.setLineDash([]);
+   // QR 15 mm (120 titik), digeser ke bawah agar ada ruang untuk garis pemanas.
+   ctx.drawImage(q,4,34,120,120);
+   ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='top';
+   const customer=$('customerInfo').value.trim();
+const type=$('unitType').value.trim();
+
+// ID unit lebih besar dan tebal
+ctx.font='bold 20px Arial';
+wrapText('SNID: '+id,134,26,240,21);
+
+// Informasi pelanggan dan tipe lebih mudah dibaca
+ctx.font='bold 15px Arial';
+let y=60;
+
+if(customer){
+  const customerLines=drawCustomerText(customer,134,y,240,18);
+  y+=Math.max(42,customerLines*18+10);
+}
+
+if(type){
+  wrapText('Tipe: '+type,134,y,240,18);
+  y+=42;
+}
+
+ctx.font='bold 12px Arial';
+ctx.fillText('OnePrint Service',134,238);
+   document.body.removeChild(holder);
+   status('Preview siap. Pastikan ID benar sebelum cetak.','ok');
+ };
+ if(q instanceof HTMLImageElement&&!q.complete){q.onload=draw;}else draw();
+ return true;
+}
+function drawCustomerText(customer,x,y,maxWidth,lineHeight){
+ // Label "Pelanggan:" hanya muncul di baris pertama. Baris lanjutan
+ // (termasuk yang dibuat dengan Enter) sejajar dengan awal nama pelanggan.
+ const prefix='Pelanggan: ';
+ const prefixWidth=ctx.measureText(prefix).width;
+ const valueX=x+prefixWidth;
+ const firstWidth=Math.max(20,maxWidth-prefixWidth);
+ const paragraphs=String(customer).replace(/\r/g,'').split('\n');
+ const lines=[];
+ paragraphs.forEach((paragraph,paragraphIndex)=>{
+   const words=paragraph.trim().split(/\s+/).filter(Boolean);
+   if(!words.length){lines.push({text:'',first:paragraphIndex===0});return;}
+   let line='',first=paragraphIndex===0;
+   for(const word of words){
+     const available=first?firstWidth:maxWidth;
+     const test=line?line+' '+word:word;
+     if(ctx.measureText(test).width>available&&line){
+       lines.push({text:line,first});line=word;first=false;
+     }else line=test;
+   }
+   lines.push({text:line,first});
+ });
+ lines.slice(0,6).forEach((line,i)=>{
+   if(i===0)ctx.fillText(prefix+line.text,x,y);
+   else ctx.fillText(line.text,valueX,y+i*lineHeight);
+ });
+ return Math.min(lines.length,6);
+}
+function wrapText(text,x,y,maxWidth,lineHeight){
+ // Enter manual tetap menjadi pemisah baris; teks panjang otomatis membungkus.
+ const paragraphs=String(text).replace(/\r/g,'').split('\n');
+ const lines=[];
+ for(const paragraph of paragraphs){
+   if(!paragraph.trim()){lines.push('');continue;}
+   const words=paragraph.trim().split(/\s+/);let line='';
+   for(const word of words){
+     const test=line?line+' '+word:word;
+     if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word;}else line=test;
+   }
+   if(line)lines.push(line);
+ }
+ lines.slice(0,6).forEach((line,i)=>ctx.fillText(line,x,y+i*lineHeight));
+ return Math.min(lines.length,6);
+}
+async function connect(){
+ if(!('bluetooth'in navigator)){throw new Error('Browser tidak mendukung Web Bluetooth. Gunakan Chrome Android.');}
+ status('Pilih printer Phomemo T02 pada dialog Bluetooth…');
+ device=await navigator.bluetooth.requestDevice({
+   filters:[{namePrefix:'T'},{namePrefix:'M'},{namePrefix:'Phomemo'}],
+   optionalServices:[0xff00,0xffe0,0xae30,'49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ff00-0000-1000-8000-00805f9b34fb']
+ });
+ device.addEventListener('gattserverdisconnected',()=>{connected=false;characteristic=null;$('print').disabled=true;status('Printer terputus. Hubungkan kembali.','err');});
+ server=await device.gatt.connect();
+ const services=[0xff00,0xffe0,0xae30,'49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ff00-0000-1000-8000-00805f9b34fb'];
+ let svc=null,last;
+ for(const s of services){try{svc=await server.getPrimaryService(s);break}catch(e){last=e}}
+ if(!svc)throw new Error('Service Bluetooth printer tidak ditemukan: '+(last?.message||''));
+ characteristic=await svc.getCharacteristic(0xff02);
+ connected=true;$('print').disabled=false;status('Terhubung: '+(device.name||'Phomemo T02'),'ok');
+}
+async function send(bytes){if(!connected||!characteristic)throw new Error('Printer belum terhubung.');
+ const data=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
+ if(characteristic.properties.writeWithoutResponse) await characteristic.writeValueWithoutResponse(data);
+ else await characteristic.writeValue(data);
+}
+async function printLabel(){
+ if(!getId()){status('Isi ID unit terlebih dahulu.','err');return}
+ if(!drawLabel())return;
+ const {data}=ctx.getImageData(0,0,384,264);
+ const widthBytes=48, rows=264, raster=new Uint8Array(widthBytes*rows);
+ for(let y=0;y<rows;y++)for(let x=0;x<384;x++){
+   const i=(y*384+x)*4;
+   const gray=(data[i]*299+data[i+1]*587+data[i+2]*114)/1000;
+   if(gray<160)raster[y*widthBytes+(x>>3)]|=(0x80>>(x&7));
+ }
+ const btn=$('print');btn.disabled=true;
+ try{
+   status('Mengirim label ke printer…');
+   await send(new Uint8Array([0x10,0xff,0xfe,0x01]));await sleep(50);
+   await send(new Uint8Array([0x1b,0x40]));await sleep(100);
+   await send(new Uint8Array([0x1b,0x37,7,80,2]));await sleep(30);
+   await send(new Uint8Array([0x1d,0x76,0x30,0x00,widthBytes,0x00,rows&255,(rows>>8)&255]));
+   for(let i=0;i<raster.length;i+=128){await send(raster.slice(i,Math.min(i+128,raster.length)));await sleep(20);status(`Mengirim data cetak… ${Math.min(100,Math.round((i+128)/raster.length*100))}%`);}
+   await sleep(300);await send(new Uint8Array([0x1b,0x4a,0]));await sleep(500);
+   status('Perintah cetak terkirim. Periksa hasil label T02.','ok');
+ }catch(e){status('Cetak gagal: '+e.message,'err');}
+ finally{btn.disabled=!connected;}
+}
+$('connect').addEventListener('click',async()=>{const b=$('connect');b.disabled=true;try{await connect()}catch(e){status('Koneksi gagal: '+e.message,'err')}finally{b.disabled=false}});
+$('previewBtn').addEventListener('click',drawLabel);
+$('print').addEventListener('click',printLabel);
+$('disconnect').addEventListener('click',()=>{try{device?.gatt?.disconnect()}catch{}connected=false;characteristic=null;$('print').disabled=true;status('Printer diputuskan.')});
+const params=new URLSearchParams(location.search);
+if(params.get('unit'))$('unitId').value=params.get('unit');
+if(params.get('customer'))$('customerInfo').value=params.get('customer');
+if(params.get('type'))$('unitType').value=params.get('type');
+if(getId())drawLabel();
+</script>
+<script src="/js/pwa-register.js" defer></script>
+</body></html>
