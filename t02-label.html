@@ -8,7 +8,7 @@
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0%,#e4f3ff,transparent 34%),#f4f9ff;color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}
 main{max-width:680px;margin:0 auto;padding:20px 16px 36px}.card{background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:20px;padding:18px;margin:14px 0;box-shadow:0 10px 28px rgba(23,43,77,.07)}
 h1{font-size:22px;margin:0 0 5px}p{margin:5px 0;color:var(--muted)}label{display:block;font-weight:650;margin-bottom:7px}input,textarea{width:100%;min-height:46px;border:1px solid #d4e0ed;border-radius:12px;padding:11px 12px;font:inherit;color:var(--ink);background:#fff}textarea{min-height:76px;resize:vertical;line-height:1.4}input:focus,textarea:focus{outline:none;border-color:var(--sky);box-shadow:0 0 0 3px #6cabdd30}
-button{min-height:44px;border:0;border-radius:12px;padding:0 15px;font:inherit;font-weight:650;cursor:pointer;background:#e8f3fc;color:var(--navy);transition:transform .18s,box-shadow .18s}button:active{transform:translateY(1px)}button.primary{background:linear-gradient(135deg,var(--sky),var(--accent));color:white;box-shadow:0 5px 14px #398ac729}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}.status{font-size:13px;padding:10px 12px;border-radius:9px;background:#f0f3f8;color:#344054;margin-top:12px}.status.ok{background:#e9f8ef;color:#17663a}.status.err{background:#fff0f0;color:#a12626}.preview{display:flex;justify-content:center;overflow:hidden;background:#eef1f5;border-radius:10px;padding:16px}.preview canvas{width:min(100%,384px);height:auto;image-rendering:pixelated;border:1px dashed #b7c0cd;background:white}.small{font-size:12px}.back{display:inline-block;color:var(--accent);text-decoration:none;margin-bottom:14px;font-weight:700}.preview{background:linear-gradient(135deg,#e8f4ff,#f6f9fd);border:1px solid #dce8f5}.preview canvas{border:1px solid #dce8f5;border-radius:4px;box-shadow:0 4px 14px #172b4d12}
+button{min-height:44px;border:0;border-radius:12px;padding:0 15px;font:inherit;font-weight:650;cursor:pointer;background:#e8f3fc;color:var(--navy);transition:transform .18s,box-shadow .18s}button:active{transform:translateY(1px)}button.primary{background:linear-gradient(135deg,var(--sky),var(--accent));color:white;box-shadow:0 5px 14px #398ac729}button:disabled{opacity:.5;cursor:wait}.row{display:flex;gap:9px;flex-wrap:wrap}.row button{flex:1}.status{font-size:13px;padding:10px 12px;border-radius:9px;background:#f0f3f8;color:#344054;margin-top:12px}.status.ok{background:#e9f8ef;color:#17663a}.status.err{background:#fff0f0;color:#a12626}.preview{display:flex;justify-content:center;overflow:hidden;background:#eef1f5;border-radius:10px;padding:16px}.preview canvas{width:min(100%,384px);height:auto;image-rendering:pixelated;border:1px dashed #b7c0cd;background:white}.small{font-size:12px}.back{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:12px;background:linear-gradient(135deg,var(--sky),var(--accent));color:#fff;text-decoration:none;margin:0 0 14px;font-weight:700;box-shadow:0 5px 14px #398ac729}.back:active{transform:translateY(1px)}.preview{background:linear-gradient(135deg,#e8f4ff,#f6f9fd);border:1px solid #dce8f5}.preview canvas{border:1px solid #dce8f5;border-radius:4px;box-shadow:0 4px 14px #172b4d12}
 </style>
 </head>
 <body><main>
@@ -53,19 +53,24 @@ function drawLabel(){
  const draw=()=>{
    ctx.fillStyle='#fff';ctx.fillRect(0,0,384,264);
    ctx.imageSmoothingEnabled=false;
-   // QR 15 mm (120 titik), ditempatkan dekat tepi atas untuk memudahkan sobek.
-   ctx.drawImage(q,4,12,120,120);
+   // Tagline branding dicetak di atas garis pemanas.
+   ctx.fillStyle='#000';ctx.textBaseline='top';ctx.textAlign='center';ctx.font='bold 10px Arial';
+   ctx.fillText('Printers • Laptops • IT Support',192,1);
+   // Garis putus-putus sebagai pemanas awal, margin sekitar 5 mm (40 titik) di tiap sisi.
+   ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.setLineDash([9,5]);ctx.beginPath();ctx.moveTo(40,19);ctx.lineTo(344,19);ctx.stroke();ctx.setLineDash([]);
+   // QR 15 mm (120 titik), digeser ke bawah agar ada ruang untuk tagline dan garis pemanas.
+   ctx.drawImage(q,4,42,120,120);
    ctx.fillStyle='#000';ctx.textAlign='left';ctx.textBaseline='top';
    const customer=$('customerInfo').value.trim();
 const type=$('unitType').value.trim();
 
 // ID unit lebih besar dan tebal
 ctx.font='bold 20px Arial';
-wrapText('SNID: '+id,134,4,240,21);
+wrapText('SNID: '+id,134,34,240,21);
 
 // Informasi pelanggan dan tipe lebih mudah dibaca
 ctx.font='bold 15px Arial';
-let y=38;
+let y=68;
 
 if(customer){
   const customerLines=drawCustomerText(customer,134,y,240,18);
