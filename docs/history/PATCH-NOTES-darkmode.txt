@@ -1,0 +1,10 @@
+PATCH NOTES — OnePrintPOS Beta dark mode/menu
+Basis: OnePrintPOS-betatest(1).zip
+Changes:
+- Added a light/dark switch above the active technician greeting in the hamburger drawer.
+- Drawer order from top to bottom: theme switch, greeting/avatar, logout. From bottom upward: logout, greeting, theme switch.
+- Greeting uses Firebase Auth displayName, falling back to email prefix, as already used by the app.
+- Theme preference is saved in localStorage on the device; no Firebase records are changed.
+- Updated cache-busting query strings for app.css and app.js.
+Manifest note: this project uses /manifest.webmanifest in the repository root, not manifest.json. If changing manifest properties, edit that exact file.
+Scope: visual/menu changes only. Review on Beta before merging to main.

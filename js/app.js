@@ -6,7 +6,7 @@ import {
   listServices, getService, findServiceByCode, saveService, removeService,
   makeServiceNumber, stats, filterOperationalServices
 } from "./features/services.js?v=20261003-fix8";
-import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261005-premium2";
+import { printReceipt, printReceiptSmart } from "./features/receipt.js?v=20261024-invoice-date-1";
 import { getUnit, saveUnit, getUnitHistory } from "./features/units.js";
 import { getPrinterConfig, savePrinterConfig, testPrinterBridge, printTestReceipt } from "./features/printer.js?v=20261005-premium2";
 import { createRestock, listRestocks, removeRestock } from "./features/restock.js?v=20261009-margin2";
@@ -279,7 +279,7 @@ function renderDashboardIncome() {
   });
 
   state.services.forEach(service => {
-    if (statusOf(service) !== "DIAMBIL") return;
+    if (!["DIAMBIL", "CANCEL"].includes(statusOf(service))) return;
     const date = accountingDateForService(service);
     if (!date || localMonthInput(date) !== monthKey) return;
     const bucket = byDate.get(localDateInput(date));
@@ -515,12 +515,18 @@ function renderMaintenance(services = state.services) {
 }
 
 function accountingMonthForService(service) {
-  const value = service?.diambilAt || service?.updatedAt || service?.tanggal;
+  const status = statusOf(service);
+  const value = status === "CANCEL"
+    ? (service?.cancelAt || service?.diambilAt || service?.updatedAt || service?.tanggal)
+    : (service?.diambilAt || service?.updatedAt || service?.tanggal);
   return ledgerMonth(value);
 }
 
 function accountingDateForService(service) {
-  return ledgerDate(service?.diambilAt || service?.updatedAt || service?.tanggal);
+  const status = statusOf(service);
+  return ledgerDate(status === "CANCEL"
+    ? (service?.cancelAt || service?.diambilAt || service?.updatedAt || service?.tanggal)
+    : (service?.diambilAt || service?.updatedAt || service?.tanggal));
 }
 
 function selectedAccountingMonth() {
@@ -791,10 +797,12 @@ function renderAccounting() {
   const nonServiceRows = ledgerRows.filter(x => String(x.sumber || "").toUpperCase() !== "SERVIS");
 
   const serviceRows = state.services
-    .filter(x => statusOf(x) === "DIAMBIL" && accountingMonthForService(x) === month)
+    .filter(x => ["DIAMBIL", "CANCEL"].includes(statusOf(x)) && accountingMonthForService(x) === month)
     .map(x => ({
       key: `service-income-${x.key || x.nomor}`,
-      tanggal: x.diambilAt || x.updatedAt || x.tanggal,
+      tanggal: statusOf(x) === "CANCEL"
+        ? (x.cancelAt || x.diambilAt || x.updatedAt || x.tanggal)
+        : (x.diambilAt || x.updatedAt || x.tanggal),
       tipe: "PEMASUKAN",
       kategori: "SERVIS",
       sumber: "SERVIS",
@@ -957,16 +965,21 @@ async function syncInventoryUsage(previousItems, nextItems) {
 }
 
 async function syncServicePayment(data, oldData) {
-  if (statusOf(data) !== "DIAMBIL") return;
+  const ledgerKey = `SERVIS_${String(data.nomor).replace(/[.#$[\\]\\/]/g, "_")}`;
+  if (!["DIAMBIL", "CANCEL"].includes(statusOf(data))) {
+    // Koreksi status dari terminal ke aktif harus menghapus entri otomatis lama.
+    await removeLedger(ledgerKey);
+    return;
+  }
 
   const amount = Number(data.total || 0);
-  const ledgerKey = `SERVIS_${String(data.nomor).replace(/[.#$[\]\/]/g, "_")}`;
-
-  // Penting: gunakan waktu DIAMBIL, bukan tanggal awal servis.
-  // Ledger memakai key deterministik per nomor servis sehingga update
-  // transaksi yang sama tidak membuat pemasukan ganda.
+  // Buku kas mengikuti pemicu status DIAMBIL; CANCEL memakai tanggal khusus.
+  // Key deterministik mencegah pemasukan ganda saat edit ulang.
+  const accountingDate = statusOf(data) === "CANCEL"
+    ? (data.cancelAt || data.diambilAt || data.updatedAt || data.tanggal)
+    : (data.diambilAt || data.tanggal);
   await saveLedger({
-    tanggal: dateInput(data.diambilAt || data.tanggal),
+    tanggal: dateInput(accountingDate),
     tipe: "PEMASUKAN",
     kategori: "SERVIS",
     sumber: "SERVIS",
@@ -975,7 +988,6 @@ async function syncServicePayment(data, oldData) {
     jumlah: amount
   }, ledgerKey);
 }
-
 
 function renderPrinterContext(printer, history = [], barcode = "") {
   const el = $("#printer-context");
@@ -1096,10 +1108,30 @@ async function saveCurrentService(print = false, type = "nota") {
     printerId: state.printerBarcode || f.serial || ""
   };
 
-  // DIAMBIL adalah momen uang servis benar-benar diterima.
-  // Simpan waktunya terpisah dari tanggal masuk servis agar laporan
-  // akuntansi mengikuti bulan saat pembayaran diterima.
-  if (newStatus === "DIAMBIL") {
+  // Tanggal operasional:
+  // - SELESAI menetapkan tanggal selesai dan tanggal invoice.
+  // - DIAMBIL menetapkan tanggal pembukuan kas servis.
+  // - CANCEL adalah jalur khusus: selesai, invoice, dan pembukuan pada hari yang sama.
+  if (newStatus === "SELESAI") {
+    data.selesaiAt = oldStatus === "SELESAI"
+      ? (old.selesaiAt || old.invoiceAt || old.updatedAt || old.tanggal || now)
+      : now;
+    data.invoiceAt = oldStatus === "SELESAI"
+      ? (old.invoiceAt || data.selesaiAt)
+      : data.selesaiAt;
+  } else if (old.selesaiAt) {
+    data.selesaiAt = old.selesaiAt;
+  }
+
+  if (newStatus === "CANCEL") {
+    const cancelDate = oldStatus === "CANCEL"
+      ? (old.cancelAt || old.selesaiAt || old.diambilAt || old.updatedAt || now)
+      : now;
+    data.cancelAt = cancelDate;
+    data.selesaiAt = oldStatus === "CANCEL" ? (old.selesaiAt || cancelDate) : cancelDate;
+    data.invoiceAt = oldStatus === "CANCEL" ? (old.invoiceAt || cancelDate) : cancelDate;
+    data.diambilAt = oldStatus === "CANCEL" ? (old.diambilAt || cancelDate) : cancelDate;
+  } else if (newStatus === "DIAMBIL") {
     data.diambilAt = oldStatus === "DIAMBIL" && old.diambilAt ? old.diambilAt : now;
   } else if (old.diambilAt) {
     data.diambilAt = old.diambilAt;

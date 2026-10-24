@@ -1,0 +1,13 @@
+OnePrintPOS Beta — patch Dark Mode + Greeting + Invoice Date (2026-10-13)
+
+Basis: OnePrintPOS-betatest(1).zip. Full project ZIP with only these app source files changed: app.html, css/app.css, js/app.js, js/features/receipt.js.
+
+Fixes:
+1. Menu drawer has Light/Dark switch above technician greeting and logout at bottom. Greeting displays “Hai, {displayName}”. Mobile drawer CSS explicitly keeps greeting text visible.
+2. Dark mode styles added for dashboard panels/stats/chart, forms, tables, statuses, cards, modals, navigation, search suggestions, login/public panels, etc. Theme preference persists locally in localStorage; no Firebase records are touched.
+3. Invoice (nota) date now uses current local device date at print/reprint time. Tanda Terima continues to use the service record date.
+4. Cache-busting versions updated for app CSS/JS and receipt module.
+
+Deployment: upload changed files to betatest, wait for Pages deployment, then hard-refresh/reopen web app. Normal HTML/CSS/JS changes do not require rebuilding APK if the installed TWA loads the same online origin. Splash/launcher icon changes are separate and do require a new APK build.
+
+Please test dark/light on dashboard, cashier, services, inventory, accounting, tools, and print invoice/tanda terima before merging to main.
