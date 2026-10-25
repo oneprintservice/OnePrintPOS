@@ -965,7 +965,7 @@ async function syncInventoryUsage(previousItems, nextItems) {
 }
 
 async function syncServicePayment(data, oldData) {
-  const ledgerKey = `SERVIS_${String(data.nomor).replace(/[.#$[\\]\\/]/g, "_")}`;
+  const ledgerKey = `SERVIS_${String(data.nomor).replace(/[.#$]/g, "_").replaceAll("[", "_").replaceAll("]", "_").replaceAll("/", "_")}`;
   if (!["DIAMBIL", "CANCEL"].includes(statusOf(data))) {
     // Koreksi status dari terminal ke aktif harus menghapus entri otomatis lama.
     await removeLedger(ledgerKey);
