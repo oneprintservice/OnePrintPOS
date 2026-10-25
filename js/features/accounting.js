@@ -75,9 +75,10 @@ export async function listLedger(limit = 5000) {
 export async function saveLedger(data, key = null) {
   const tipe = data.tipe === "PENGELUARAN" ? "PENGELUARAN" : "PEMASUKAN";
   const jumlah = Math.max(0, Number(data.jumlah) || 0);
-  if (jumlah <= 0) throw new Error("Jumlah transaksi harus lebih dari 0.");
-
   const sumber = String(data.sumber || "MANUAL").toUpperCase();
+  // Entri SERVIS bernilai nol diperbolehkan untuk merekam CANCEL tanpa biaya
+  // pemeriksaan/pembayaran; transaksi kas manual tetap wajib positif.
+  if (jumlah <= 0 && sumber !== "SERVIS") throw new Error("Jumlah transaksi harus lebih dari 0.");
   const baseKey = safeKey(data.keterangan || "transaksi");
   const id = key || (
     sumber === "MANUAL"

@@ -1,0 +1,10 @@
+PATCH RETENSI STATUS CANCEL — OnePrintPOS Beta
+
+Perubahan:
+- Status CANCEL memakai updatedAt (waktu status terakhir diubah) sebagai tanggal acuan retensi, bukan tanggal awal servis.
+- Status DIAMBIL tetap memakai diambilAt, lalu updatedAt, lalu tanggal sebagai fallback.
+- Kebijakan tampilan tetap: servis terminal dipertahankan selama bulan berjalan dan bulan kalender sebelumnya.
+- Data yang tersembunyi dari daftar tidak otomatis dihapus oleh patch ini; penghapusan fisik hanya terjadi jika fungsi maintenance cleanup dijalankan.
+- Hanya js/features/services.js yang diubah; file fitur lain dari ZIP sumber dipertahankan.
+
+Penting: Uji di branch betatest dahulu, jangan main. Setelah deploy, muat ulang aplikasi. Servis CANCEL lama yang masih ada di Firebase seharusnya muncul kembali karena updatedAt baru. Patch ini tidak dapat memulihkan data yang benar-benar sudah dihapus dari Firebase.

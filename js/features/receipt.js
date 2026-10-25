@@ -197,7 +197,10 @@ export function buildReceipt(data, tipe = "nota") {
   const teknisi = data.teknisi || "-";
   const jasa = Array.isArray(data.jasa) ? data.jasa : [];
   const sparepart = Array.isArray(data.sparepart) ? data.sparepart : [];
-  const tgl = new Date(data.tanggal || Date.now()).toLocaleDateString("id-ID");
+  const tanggalDokumen = tipe === "nota"
+    ? (data.invoiceAt || data.selesaiAt || (["SELESAI", "DIAMBIL", "CANCEL"].includes(String(data.status || "").toUpperCase()) ? data.updatedAt : null) || data.tanggal)
+    : data.tanggal;
+  const tgl = new Date(tanggalDokumen || Date.now()).toLocaleDateString("id-ID");
   const trackingUrl = `https://oneprintservice.web.id/tracking.html?tt=${encodeURIComponent(noNota)}`;
 
   const logoPath = "assets/logos.png";

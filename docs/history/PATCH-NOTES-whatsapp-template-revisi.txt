@@ -1,0 +1,13 @@
+REVISI TEMPLATE WHATSAPP SERVIS SELESAI
+
+Berdasarkan patch beta WhatsApp servis selesai yang sudah disetujui, revisi ini hanya mengubah isi pesan dan cache-buster app.js.
+
+Perubahan:
+- Frasa *SELESAI DIPERBAIKI* dicetak tebal di WhatsApp.
+- Nomor servis, perangkat, serial number, dan total biaya invoice ditampilkan pada baris terpisah dengan jarak antarbagian.
+- Total biaya mengambil field service.total yang sama dengan total invoice; tidak dihitung ulang dari sumber lain.
+- Kalimat antar-jemput diubah tanpa kata rekanan.
+- Penutup menjadi: > ⓘ _Pesan ini dikirim secara otomatis melalui sistem._
+- Alur perubahan status, nomor telepon, sapaan waktu, dan tombol buka WhatsApp tetap dipertahankan.
+
+Uji sintaks JavaScript dilakukan. Silakan deploy ke branch betatest dan uji satu servis sebelum dipakai rutin. Jangan deploy ke main sebelum beta dinyatakan lolos.

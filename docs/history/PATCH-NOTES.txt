@@ -1,0 +1,14 @@
+OnePrintPOS PWA Stage 1 — patch bundle
+
+Target: branch betatest only. Do not deploy to main/production yet.
+
+Overlay these paths onto the latest repository baseline:
+- New: manifest.webmanifest
+- New: sw.js
+- New: js/pwa-register.js
+- New: assets/pwa-192.png, assets/pwa-512.png
+- Replace: login.html, app.html, t02-label.html
+
+The HTML edits only add PWA metadata and service-worker registration. No Firebase config or business logic was changed. The service worker does not cache app pages, Firebase responses, authentication, or transactions. Its offline navigation fallback returns a small HTML page with HTTP 200 and clearly says internet is required.
+
+Next: commit these files only on betatest, wait for Pages deployment, then validate manifest/worker/icons and test app workflows and Phomemo T02 from Chrome Android. No APK should be produced until these checks pass.
