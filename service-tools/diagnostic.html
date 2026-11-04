@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172b4d">
+  <title>OnePrint Technician Diagnostic</title>
+  <link rel="stylesheet" href="../assets/print-test/print-test.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="../index.html"><span class="brand-mark">OP</span><span><strong>ONEPRINT</strong><small>TECHNICIAN TOOLS</small></span></a>
+    <a class="back-link" href="../print-test.html">Mode publik ↗</a>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div class="eyebrow">INTERNAL WORKSHOP TOOL</div>
+      <h1>Diagnostic Print Patterns</h1>
+      <p>Pola pemeriksaan visual lanjutan untuk membantu teknisi membandingkan hasil cetak inkjet dan laserjet.</p>
+      <div class="notice"><strong>Penggunaan internal:</strong> halaman ini tidak ditautkan dari website publik. URL yang tidak ditautkan bukan sistem keamanan; siapa pun yang mengetahui alamatnya tetap dapat membukanya.</div>
+    </section>
+    <section class="test-grid">
+      <article class="test-card"><div class="card-icon mono">M</div><h2>Diagnostic Mono</h2><p>Fine lines, halftone, micro text, density steps, dan repeating patterns.</p><button class="primary" data-test="diagnostic-mono">Buka pratinjau</button></article>
+      <article class="test-card"><div class="card-icon color">C</div><h2>Diagnostic Color</h2><p>CMYK density, color overlap, gradients, registration guides, dan halftone.</p><button class="primary" data-test="diagnostic-color">Buka pratinjau</button></article>
+    </section>
+    <section class="preview-panel" id="previewPanel" hidden>
+      <div class="preview-heading"><div><div class="eyebrow">TECHNICIAN PRINT PREVIEW</div><h2 id="previewTitle">Pratinjau diagnostik</h2></div><div class="preview-actions"><button class="secondary" id="closePreview" type="button">Tutup</button><button class="primary" id="printButton" type="button">Cetak pola diagnostik</button></div></div>
+      <div class="paper-wrap"><div id="printCanvas" class="print-page"></div></div>
+    </section>
+    <footer class="page-footer"><strong>OnePrint Repair Service</strong><span>Diagnostic pattern is a visual aid, not a substitute for manufacturer self-test.</span></footer>
+  </main>
+  <script src="../assets/print-test/print-test.js"></script>
+</body>
+</html>

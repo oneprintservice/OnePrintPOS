@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172b4d">
+  <title>OnePrint Print Test — Tes Kualitas Printer Gratis</title>
+  <link rel="stylesheet" href="assets/print-test/print-test.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Kembali ke OnePrint">
+      <span class="brand-mark">OP</span>
+      <span><strong>ONEPRINT</strong><small>PRINT TEST</small></span>
+    </a>
+    <a class="back-link" href="index.html">Kembali ke website ↗</a>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <div class="eyebrow">FREE PRINTER QUALITY TEST</div>
+      <h1>Periksa kualitas cetak printer Anda.</h1>
+      <p>Pilih pola pengujian, lihat pratinjau, lalu cetak menggunakan printer dan driver yang sudah terpasang. Tidak perlu login atau memasang aplikasi tambahan.</p>
+      <div class="notice"><strong>Catatan:</strong> Desain pola menggunakan bidang A4 portrait. Pengaturan printer, ukuran media aktual, paper tray, kualitas, dan warna tetap mengikuti dialog cetak serta driver printer Anda.</div>
+    </section>
+
+    <section class="test-grid" aria-label="Pilih pengujian">
+      <article class="test-card">
+        <div class="card-icon mono">Aa</div>
+        <h2>Basic Mono Test</h2>
+        <p>Teks, garis halus, bidang hitam, dan gradasi abu-abu untuk pemeriksaan dasar printer monokrom maupun hitam-putih.</p>
+        <button class="primary" data-test="basic-mono">Buka pratinjau</button>
+      </article>
+      <article class="test-card">
+        <div class="card-icon color">◒</div>
+        <h2>Basic Color Test</h2>
+        <p>Bidang CMYK dan RGB, campuran warna, gradasi, serta teks untuk pemeriksaan dasar printer warna.</p>
+        <button class="primary" data-test="basic-color">Buka pratinjau</button>
+      </article>
+    </section>
+
+    <section class="preview-panel" id="previewPanel" hidden>
+      <div class="preview-heading">
+        <div><div class="eyebrow">PRINT PREVIEW</div><h2 id="previewTitle">Pratinjau pengujian</h2></div>
+        <div class="preview-actions">
+          <button class="secondary" id="closePreview" type="button">Tutup</button>
+          <button class="primary" id="printButton" type="button">Cetak test page</button>
+        </div>
+      </div>
+      <div class="paper-wrap"><div id="printCanvas" class="print-page"></div></div>
+    </section>
+
+    <footer class="page-footer">
+      <strong>OnePrint Repair Service</strong>
+      <span>Fasilitas pengujian kualitas cetak gratis.</span>
+    </footer>
+  </main>
+
+  <script src="assets/print-test/print-test.js"></script>
+</body>
+</html>

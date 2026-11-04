@@ -1,0 +1,15 @@
+Referensi prinsip diagram overlap warna:
+
+1. University of Arizona, Color Models: diagram tiga lingkaran RGB dan CMY beserta hasil irisan pasangan.
+   https://www2.cs.arizona.edu/classes/cs451/graphics.pdf
+
+2. University of New South Wales, Colour mixing and colour vision: penjelasan additive RGB dan subtractive CMY.
+   https://animations.physics.unsw.edu.au/jw/light/colour-mixing.htm
+
+3. Imaging Science and Technology (IS&T), A Tutorial on Printing: prinsip warna primer tinta CMY dan reproduksi warna cetak.
+   https://www.imaging.org/IST/IST/Resources/Tutorials/Printing.aspx
+
+Catatan penting:
+- RGB adalah pencampuran cahaya (additive): R+G=kuning, R+B=magenta, G+B=cyan, RGB=putih.
+- CMY adalah pencampuran tinta/filter (subtractive): C+M=biru, C+Y=hijau, M+Y=merah, CMY secara teori=hitam.
+- Tinta nyata tidak selalu menghasilkan hitam netral saat C+M+Y ditumpuk; printer memakai kanal K untuk hitam yang lebih pekat/netral dan efisien.

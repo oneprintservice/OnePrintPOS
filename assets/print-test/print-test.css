@@ -1,0 +1,41 @@
+*{box-sizing:border-box}
+:root{--navy:#172b4d;--blue:#398ac7;--sky:#6cabdd;--pale:#f4f9ff;--gold:#c9a45c;--ink:#172033}
+body{margin:0;background:var(--pale);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
+.site-header{height:72px;padding:0 max(22px,calc((100% - 1120px)/2));display:flex;align-items:center;justify-content:space-between;background:#fff;border-bottom:1px solid #e6edf5}
+.brand{display:flex;gap:11px;align-items:center;color:var(--navy);text-decoration:none;letter-spacing:.08em}
+.brand-mark{width:40px;height:40px;border-radius:12px;background:var(--navy);color:white;display:grid;place-items:center;font-weight:800}
+.brand strong,.brand small{display:block}.brand small{font-size:10px;color:#68809b;letter-spacing:.18em;margin-top:3px}
+.back-link{font-size:13px;color:var(--blue);text-decoration:none;font-weight:650}
+.shell{max-width:1120px;margin:0 auto;padding:48px 22px}
+.intro{max-width:760px;margin-bottom:30px}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.16em;color:var(--blue)}
+h1{font-size:clamp(30px,5vw,48px);line-height:1.08;color:var(--navy);margin:12px 0}
+.intro p{font-size:16px;line-height:1.7;color:#607086;max-width:700px}
+.notice{margin-top:20px;padding:14px 16px;border:1px solid #dce8f5;border-left:4px solid var(--gold);border-radius:10px;background:#fff;color:#53647a;font-size:13px;line-height:1.6}
+.test-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.test-card{background:#fff;border:1px solid #e6edf5;border-radius:18px;padding:25px;box-shadow:0 10px 30px #172b4d08}
+.card-icon{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-weight:850;font-size:20px;margin-bottom:18px}
+.card-icon.mono{background:#edf1f5;color:#172033}.card-icon.color{background:linear-gradient(135deg,#00a6d6,#d32f88,#f3c52e);color:white}
+h2{color:var(--navy);margin:0 0 10px;font-size:21px}
+.test-card p{color:#66758a;font-size:14px;line-height:1.65;min-height:68px}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:12px 17px;font-weight:750}
+.primary{background:var(--navy);color:#fff}.primary:hover{background:#244575}
+.secondary{background:#edf3f9;color:var(--navy)}
+.preview-panel{margin-top:28px;padding:22px;background:#eaf1f8;border-radius:18px}
+.preview-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}
+.preview-heading h2{margin-top:5px}.preview-actions{display:flex;gap:8px}
+.paper-wrap{overflow:auto;padding:18px;background:#dce5ee;border-radius:12px}
+.print-page{width:794px;min-height:1123px;margin:0 auto;background:white;box-shadow:0 4px 20px #172b4d20}
+.page-footer{display:flex;justify-content:space-between;gap:12px;margin-top:34px;padding-top:18px;border-top:1px solid #dfe8f1;color:#718096;font-size:12px}
+.page-footer strong{color:var(--navy)}
+/* SVG content is sized to an A4 portrait canvas with 8 mm print margins. */
+.print-page svg{display:block;width:100%;height:auto;background:white}
+@media(max-width:650px){.shell{padding:30px 16px}.test-grid{grid-template-columns:1fr}.test-card p{min-height:0}.preview-heading{align-items:flex-start;flex-direction:column}.preview-actions{width:100%}.preview-actions button{flex:1}.page-footer{flex-direction:column}.site-header{padding:0 16px}}
+@page{size:A4 portrait;margin:8mm}
+@media print{
+  html,body{margin:0!important;padding:0!important;background:#fff!important}
+  body *{visibility:hidden!important}
+  #printCanvas,#printCanvas *{visibility:visible!important}
+  #printCanvas{position:absolute!important;left:0!important;top:0!important;width:194mm!important;height:281mm!important;min-height:0!important;margin:0!important;padding:0!important;box-shadow:none!important;overflow:hidden!important}
+  #printCanvas svg{display:block!important;width:194mm!important;height:281mm!important;max-height:281mm!important}
+}
