@@ -95,6 +95,50 @@ function normalizeWhatsAppNumber(value) {
   return number;
 }
 
+function offerWhatsAppDiagnosisMessage(service) {
+  const phone = normalizeWhatsAppNumber(service.telp);
+  if (!phone) {
+    view.toast("Status servis menjadi DIAGNOSA. Nomor HP kosong, pesan pelanggan dilewati.", "info");
+    return;
+  }
+
+  const greeting = getTimeGreeting();
+  const number = service.nomor || service.key || "-";
+  const device = service.merk || "perangkat Anda";
+  const serial = service.serial || "-";
+  const message = [
+    `Selamat ${greeting}.`,
+    "",
+    "Kami informasikan bahwa perangkat Anda saat ini sedang dalam tahap *PEMERIKSAAN DAN DIAGNOSIS* di *OnePrint Service*.",
+    "",
+    `*No. Servis:* ${number}`,
+    "",
+    `*Perangkat:* ${device}`,
+    "",
+    `*Serial Number:* ${serial}`,
+    "",
+    "Setelah pemeriksaan selesai, perangkat akan kami masukkan ke antrean pengerjaan sesuai hasil diagnosis. Jika ditemukan kebutuhan perbaikan atau biaya tambahan yang memerlukan persetujuan, kami akan menghubungi Anda terlebih dahulu sebelum melanjutkan pengerjaan.",
+    "",
+    "Terima kasih telah mempercayakan pemeriksaan perangkat Anda kepada *OnePrint Service*.",
+    "",
+    "> ⓘ _Pesan ini disiapkan oleh sistem secara otomatis._"
+  ].join("\n");
+
+  view.modal("Servis dalam diagnosis — hubungi pelanggan", `
+    <div class="stack" style="gap:12px">
+      <p>Nomor pelanggan tersedia. Pesan berikut sudah disiapkan dengan sapaan waktu otomatis.</p>
+      <div style="white-space:pre-wrap;border:1px solid var(--line,#ddd);border-radius:10px;padding:12px;line-height:1.5">${escapeHtml(message)}</div>
+      <button id="send-diagnosis-whatsapp" class="primary" type="button">Buka WhatsApp dan kirim pesan</button>
+      <p class="muted" style="font-size:12px;margin:0">WhatsApp akan membuka percakapan dengan pesan terisi. Pesan belum terkirim sampai tombol Kirim ditekan di WhatsApp.</p>
+    </div>
+  `);
+  const button = $("#send-diagnosis-whatsapp");
+  button?.addEventListener("click", () => {
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  });
+}
+
 function offerWhatsAppCompletionMessage(service) {
   const phone = normalizeWhatsAppNumber(service.telp);
   if (!phone) {
@@ -1162,7 +1206,9 @@ async function saveCurrentService(print = false, type = "nota") {
   // Offer a WhatsApp-ready message only on the first transition into SELESAI.
   // This does not send automatically; the user confirms the send in WhatsApp.
   const justCompleted = oldStatus !== "SELESAI" && newStatus === "SELESAI";
+  const justEnteredDiagnosis = oldStatus !== "DIAGNOSA" && newStatus === "DIAGNOSA";
   state.editServiceOriginal = { ...data, key: savedKey };
+  if (justEnteredDiagnosis) offerWhatsAppDiagnosisMessage({ ...data, key: savedKey });
   if (justCompleted) offerWhatsAppCompletionMessage({ ...data, key: savedKey });
 }
 
